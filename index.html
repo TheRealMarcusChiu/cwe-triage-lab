@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>CWE Triage Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to exercise</a>
+  <header>
+    <p class="brand">CWE Triage Lab <span>scanner alert drills</span></p>
+    <nav aria-label="Modules">
+      <a href="#m94">Code generation</a>
+      <a href="#m79">Cross-site scripting</a>
+      <a href="#m78">OS commands</a>
+      <a href="#m22">Path traversal</a>
+      <a href="#queue">Mixed queue</a>
+    </nav>
+  </header>
+  <p id="storage-warning" class="warning" role="alert" hidden></p>
+  <main id="main" tabindex="-1"></main>
+  <footer>
+    <p>Local only: drafts and progress are stored in this browser's localStorage under one key and are never sent anywhere. Anyone using this browser profile can read them.</p>
+    <button type="button" id="reset" class="quiet">Reset saved progress</button>
+  </footer>
+  <noscript><p class="warning">This lab needs JavaScript enabled.</p></noscript>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

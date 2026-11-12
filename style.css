@@ -1,0 +1,101 @@
+:root {
+  --plum: #3d2a40;
+  --plum-2: #5a3f5e;
+  --steel: #4f5f6e;
+  --steel-l: #d9dee3;
+  --amber: #b9771f;
+  --amber-l: #f6e7cc;
+  --paper: #f5f2ee;
+  --ink: #1f1a21;
+  --ok: #2f6b45;
+  --bad: #9a2f2f;
+  --code-bg: #271d2a;
+  --code-ink: #efe6da;
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+h2, h3, h4, h5 { font-weight: 650; letter-spacing: -0.01em; line-height: 1.25; margin: 1.2em 0 0.4em; }
+h2 { font-size: 1.35rem; color: var(--plum); }
+h3 { font-size: 1.1rem; }
+h4 { font-size: 1rem; }
+h5 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--steel); }
+a { color: var(--plum-2); }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+code, pre { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.86rem; }
+
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 0.5rem; top: 0.5rem; background: #fff; padding: 0.5rem; z-index: 2; }
+
+header { background: var(--plum); color: #f3ebf2; padding: 0.5rem clamp(0.75rem, 3vw, 2rem); display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem; }
+.brand { margin: 0; font-weight: 700; letter-spacing: 0.02em; }
+.brand span { font-weight: 400; opacity: 0.75; margin-left: 0.4rem; }
+nav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+nav a { color: inherit; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 0.7rem; border-bottom: 3px solid transparent; }
+nav a[aria-current="page"] { border-bottom-color: var(--amber); background: var(--plum-2); }
+nav a:hover { background: var(--plum-2); }
+
+main { padding: 0 clamp(0.75rem, 3vw, 2rem) 2rem; max-width: 84rem; margin: 0 auto; }
+.intro { color: var(--steel); max-width: 60rem; margin-top: 0; }
+.warning { margin: 0; padding: 0.7rem clamp(0.75rem, 3vw, 2rem); background: var(--amber-l); border-bottom: 2px solid var(--amber); }
+
+.exercise { border-top: 2px solid var(--plum); padding-top: 0.25rem; margin-top: 1.5rem; }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1rem 1.5rem; align-items: start; }
+.evidence, .decision { min-width: 0; }
+.alert { border-left: 4px solid var(--amber); background: #fff; padding: 0.5rem 0.75rem; }
+.alert p { margin: 0.15rem 0; }
+.alert-head { overflow-wrap: anywhere; }
+.sev { background: var(--amber); color: #1d1408; font-weight: 700; padding: 0 0.4rem; font-size: 0.8rem; text-transform: uppercase; }
+.loc, .lang { color: var(--steel); font-size: 0.85rem; overflow-wrap: anywhere; }
+.scenario { margin: 0.6rem 0 0.2rem; }
+.lang { margin: 0.4rem 0 0.2rem; }
+pre.code { background: var(--code-bg); color: var(--code-ink); padding: 0.75rem; margin: 0; overflow-x: auto; border-radius: 2px; tab-size: 2; }
+.hint { margin-top: 0.6rem; }
+.hint summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; } /* flex drops the native marker, so ::before draws it */
+.hint summary::before { content: '▸ '; }
+.hint[open] summary::before { content: '▾ '; }
+
+.decision { background: #fff; border: 1px solid var(--steel-l); padding: 0.25rem 0.9rem 0.9rem; }
+.field { margin: 0.7rem 0 0; border: 0; padding: 0; min-width: 0; }
+.field > label:not(.radio), legend { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.2rem; }
+select, textarea, button { font: inherit; min-height: 44px; width: 100%; border: 1px solid var(--steel); background: #fff; color: var(--ink); border-radius: 2px; }
+select { padding: 0 0.4rem; }
+textarea { padding: 0.45rem; resize: vertical; }
+[aria-invalid="true"] { border-color: var(--bad); box-shadow: inset 4px 0 0 var(--bad); }
+.radio { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; cursor: pointer; }
+.radio input { width: 1.2rem; height: 1.2rem; margin: 0; flex: none; accent-color: var(--plum); }
+button { background: var(--plum); color: #fff; border-color: var(--plum); font-weight: 600; margin-top: 0.9rem; cursor: pointer; }
+button:hover { background: var(--plum-2); }
+button.quiet { background: transparent; color: var(--plum); width: auto; padding: 0 1rem; margin: 0; }
+.errors { color: var(--bad); margin: 0.6rem 0 0; }
+.errors:empty { display: none; }
+.locked { color: var(--steel); margin: 0.8rem 0 0; }
+:disabled, [readonly] { background: #f0edf0; }
+
+.feedback { margin-top: 1rem; padding: 0.25rem 1rem 1rem; background: #fff; border-left: 4px solid var(--steel); }
+.feedback h4 { margin-top: 0.75rem; }
+.marks { padding-left: 0; list-style: none; }
+.marks .ok { color: var(--ok); }
+.marks .bad { color: var(--bad); }
+.mapped strong { color: var(--plum); }
+.model dt { font-weight: 600; }
+.model dd { margin: 0 0 0.5rem; }
+.side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
+.side figure { margin: 0; min-width: 0; }
+figcaption { font-weight: 600; font-size: 0.85rem; color: var(--steel); margin-bottom: 0.2rem; }
+.muted { color: var(--steel); }
+.table-wrap { overflow-x: auto; margin-top: 1rem; }
+table.regress { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9rem; }
+.regress caption { text-align: left; color: var(--steel); padding-bottom: 0.3rem; }
+.regress th, .regress td { border-bottom: 1px solid var(--steel-l); padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+.regress td code { overflow-wrap: anywhere; }
+.regress tr.pass td:last-child { color: var(--ok); font-weight: 700; }
+.regress tr.fail td:last-child { color: var(--bad); font-weight: 700; }
+.summary.pass { color: var(--ok); font-weight: 600; }
+.summary.fail { color: var(--bad); font-weight: 600; }
+.sources { margin-top: 2rem; border-top: 1px solid var(--steel-l); }
+
+footer { padding: 1rem clamp(0.75rem, 3vw, 2rem); background: var(--steel-l); display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; justify-content: space-between; font-size: 0.85rem; }
+footer p { margin: 0; max-width: 48rem; }
