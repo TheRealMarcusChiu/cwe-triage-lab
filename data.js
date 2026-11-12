@@ -22,7 +22,7 @@
       nav: 'Code generation',
       cwe: 'CWE-94',
       title: 'Code injection',
-      intro: 'Trace request data into text that the application later compiles or evaluates as its own code.',
+      intro: 'Find request text that the app compiles or evaluates as code.',
       links: [
         ['MITRE CWE-94: Improper Control of Generation of Code', SRC.cwe94],
         ['MITRE CWE-95: Eval Injection (child of CWE-94)', SRC.cwe95],
@@ -30,10 +30,10 @@
       ],
       // Beginner first screen. Outcomes are fixed strings; nothing runs.
       basics: {
-        lesson: 'Never run user text as code. Check its shape, then call a fixed function you wrote.',
-        problem: 'A calculator page reads a sum such as "2 + 3" from the web address and shows the answer. To work it out, the server passes the text to eval(), which runs any JavaScript it is given.',
-        why: 'Here the input is the expr text in the web address, and the sink is eval(). Anyone can put real JavaScript in the address instead of a sum, and the server runs it with its own access, for example to read its secret files.',
-        works: 'The fixed code never runs the text. It first checks that the text looks like "number, + or *, number" and answers 400 to anything else. Then it calls a small function the developer wrote, so the only thing that can happen is adding or multiplying.',
+        lesson: 'Never run user text as code.',
+        problem: 'The calculator reads expr from the URL and passes it to eval(). Anyone who controls expr can make the server run JavaScript.',
+        line: 'eval() is the sink, the operation that uses the input. It runs expr as JavaScript with the server\'s access.',
+        works: 'Anything other than "number + or * number" gets 400 before any code runs. OPS can only add or multiply.',
         unsafe: {
           code: "const expr = req.query.expr;   // \"2 + 3\"\nres.send(String(eval(expr)));",
           hot: 1,
@@ -66,8 +66,8 @@
         {
           id: 'm94-promo',
           title: 'Promo rule preview',
-          scenario: 'Store managers type a discount rule and preview the rate for their current cart.',
-          alert: { rule: 'js/dynamic-code-from-request', severity: 'High', location: 'reports/discount.js:4', message: 'Request body value flows into Function constructor.' },
+          scenario: 'Managers type a discount rule to preview their cart\'s rate.',
+          alert: { rule: 'js/dynamic-code-from-request', severity: 'High', location: 'reports/discount.js:4', message: 'Request body reaches the Function constructor.' },
           lang: 'JavaScript (Node/Express)',
           code: [
             '// reports/discount.js',
@@ -83,14 +83,13 @@
           cls: 'confirmed',
           cwe: 'CWE-94, specifically its child CWE-95 (Eval Injection)',
           worked: [
-            'Trace: rule comes from the request body, is concatenated into source text, and new Function compiles it. Whatever the user types becomes code running with the server process privileges.',
-            'CWE-95 is the more specific child of CWE-94: input reaches a dynamic evaluation call such as eval() or the Function constructor. CWE-94 is the broader class, which also covers generating code files or templates that are loaded later.',
-            'Login does not help: every logged-in manager (or a stolen manager session) can run code. Blocklists and sandboxes keep losing to new syntax; the fix is to stop evaluating text.',
+            'Evidence: req.body.rule is concatenated into source text and compiled by new Function, so any logged-in manager (or stolen session) runs code as the server.',
+            'CWE-95 is the child of CWE-94 for input reaching eval() or the Function constructor. Blocklists miss new syntax and node:vm is not a security boundary; stop evaluating text.',
           ],
           model: {
             impact: 'Server-side code execution: read process.env secrets, call internal services, run commands as the app user.',
-            ticket: 'Replace new Function in /api/promo/preview with a fixed table of named rule handlers (or a small parser for numbers, cart fields, comparisons and ?:). Reject unknown rules with 400.',
-            verification: 'Ordinary rule still returns 0.15 for a 90.00 cart; the env-reading and constructor-escape payloads return 400; no eval/new Function/vm call remains on request paths.',
+            ticket: 'Replace new Function in /api/promo/preview with named rule handlers or a small parser (numbers, cart fields, comparisons, ?:). Reject unknown rules with 400.',
+            verification: 'A 90.00 cart still gets 0.15; the env-reading and constructor-escape payloads get 400; no eval, new Function or vm call remains on request paths.',
           },
           fix: {
             regressions: [
@@ -168,16 +167,16 @@
       nav: 'Cross-site scripting',
       cwe: 'CWE-79',
       title: 'Cross-site scripting',
-      intro: 'Three placements of untrusted text: reflected by the server, stored and replayed to other users, and written into the DOM by client script. Each needs the protection for its context.',
+      intro: 'Reflected, stored and DOM-based: each output context needs its own protection.',
       links: [
         ['MITRE CWE-79: Improper Neutralization of Input During Web Page Generation', SRC.cwe79],
         ['OWASP Cross Site Scripting Prevention Cheat Sheet', SRC.xss],
       ],
       basics: {
-        lesson: 'Put user text into the page as text, not HTML. (Rich HTML needs a sanitizer: see Practice.)',
-        problem: 'A welcome banner reads a name from the web address, such as ?name=Ana, and shows "Hi Ana" at the top of the page.',
-        why: 'Here the input is the name in the web address, and the sink is innerHTML, which reads its text as HTML. If someone sends a visitor a link whose name contains an HTML tag, the browser builds that tag, and a script in it runs as that visitor on this site.',
-        works: 'textContent puts the name on the page as plain text. The browser never reads it as HTML, so a tag appears as ordinary characters and nothing runs.',
+        lesson: 'Insert user text as text, not HTML. Rich HTML needs a sanitizer (see Practice).',
+        problem: 'The banner reads name from the URL and writes it with innerHTML. A link with HTML in name runs the attacker\'s script as the visitor, on this site.',
+        line: 'innerHTML parses name as HTML, so a tag in it becomes a real element.',
+        works: 'textContent inserts name as plain text, so a tag shows as characters and nothing runs.',
         unsafe: {
           code: "const name = params.get('name');\nhello.innerHTML = 'Hi ' + name;",
           hot: 1,
@@ -205,8 +204,8 @@
         {
           id: 'm79-reflected',
           title: 'Reflected: search results page',
-          scenario: 'The catalog search echoes the term back in the server-rendered page.',
-          alert: { rule: 'js/reflected-html', severity: 'Medium', location: 'search.js:5', message: 'Query parameter written to HTML response without encoding.' },
+          scenario: 'Catalog search echoes the term in the server-rendered page.',
+          alert: { rule: 'js/reflected-html', severity: 'Medium', location: 'search.js:5', message: 'Query parameter written to HTML without encoding.' },
           lang: 'JavaScript (Node/Express)',
           code: [
             '// search.js',
@@ -222,14 +221,13 @@
           cls: 'confirmed',
           cwe: 'CWE-79 (reflected, Type 1)',
           worked: [
-            'Trace: q is read from the URL and placed between HTML tags in the response. A victim who opens a crafted link runs the attacker\'s markup in this site\'s origin.',
-            'The fix for an HTML body context is HTML entity encoding, ideally by an auto-escaping template so every value is covered, not just the ones someone remembered.',
-            'An HTML sanitizer is the tool for user-authored rich HTML (for example a WYSIWYG bio), not for plain text: it changes legitimate input such as "C++ <vector> header", removing the unknown <vector> element. It is also not a universal defense for URL, JavaScript or CSS contexts.',
+            'Evidence: q from the URL goes raw between HTML tags in res.send, so a crafted link runs the attacker\'s markup in this site\'s origin.',
+            'HTML body text needs HTML entity encoding, best from an auto-escaping template. A sanitizer is for rich HTML: it removes the <vector> in "C++ <vector> header" and does not cover URL, JavaScript or CSS contexts.',
           ],
           model: {
-            impact: 'Script in our origin for anyone who follows a crafted link: session actions, data theft, phishing inside the real page.',
-            ticket: 'Render /search through the auto-escaping template engine; remove string-built HTML from search.js.',
-            verification: '"C++ <vector> header" displays exactly; the img/onerror payload appears as visible text and no handler runs.',
+            impact: 'Script in our origin for anyone who opens a crafted link: session actions, data theft, in-page phishing.',
+            ticket: 'Render /search with the auto-escaping template engine; remove string-built HTML from search.js.',
+            verification: '"C++ <vector> header" displays exactly; the img/onerror payload shows as text and no handler runs.',
           },
           fix: {
             regressions: [
@@ -267,8 +265,8 @@
         {
           id: 'm79-stored',
           title: 'Stored: profile website link',
-          scenario: 'Users save a website URL in settings; it is shown as a link on their public profile.',
-          alert: { rule: 'tmpl/stored-url-attribute', severity: 'Medium', location: 'views/profile.ejs:3', message: 'Stored user field rendered into href attribute.' },
+          scenario: 'Users save a website URL that shows as a link on their public profile.',
+          alert: { rule: 'tmpl/stored-url-attribute', severity: 'Medium', location: 'views/profile.ejs:3', message: 'Stored user field rendered into an href attribute.' },
           lang: 'EJS template',
           code: [
             '<!-- views/profile.ejs  (user.website saved earlier via POST /settings) -->',
@@ -281,14 +279,13 @@
           cls: 'confirmed',
           cwe: 'CWE-79 (stored, Type 2)',
           worked: [
-            'Trace: the owner saves website once; every visitor\'s browser receives it inside href. <%= %> attribute-escapes quotes, so attribute breakout fails, but a javascript: URL is still a valid href and runs on click.',
-            'URL-bearing attributes need URL validation: parse the value, allow only expected schemes (https:, http:) and then attribute-encode.',
-            'Other contexts need their own handling too: values placed in style need a fixed property plus an allowlisted value (for example element.style.setProperty), and data needed by scripts should be passed as data, never inserted into script source or event-handler attributes.',
+            'Evidence: user.website is saved once and rendered into href for every visitor. <%= %> escapes quotes, so breakout fails, but a javascript: URL is still a valid href and runs on click.',
+            'URL attributes need URL validation: parse, allow only http:/https:, then attribute-encode. Style values need a fixed property and allowlisted value; script data goes in as data, never into script source or event-handler attributes.',
           ],
           model: {
-            impact: 'Any visitor who clicks the link runs script in our origin; stored payload hits many users without a crafted link.',
-            ticket: 'Validate website on save and on render: new URL(value), allow protocol http:/https: only, store the normalised href; keep attribute encoding.',
-            verification: 'https://ana.example/portfolio still links; javascript: and data: URLs are rejected on save and not rendered as links; quote-breakout payload stays inside the attribute.',
+            impact: 'Any visitor who clicks runs script in our origin; one stored payload hits many users without a crafted link.',
+            ticket: 'On save and render, parse website with new URL(), allow only http:/https:, store the normalised href; keep attribute encoding.',
+            verification: 'https://ana.example/portfolio still links; javascript: and data: URLs are rejected and not linked; the quote-breakout payload stays inside href.',
           },
           fix: {
             regressions: [
@@ -338,7 +335,7 @@
         {
           id: 'm79-dom',
           title: 'DOM-based: welcome banner',
-          scenario: 'Client script greets the user by a name taken from the page URL. The server never sees the payload in the HTML it sends.',
+          scenario: 'Client script greets the user by a name from the page URL. The payload never appears in the server\'s HTML.',
           alert: { rule: 'js/dom-html-sink', severity: 'Medium', location: 'public/welcome.js:3', message: 'location.search flows to innerHTML.' },
           lang: 'JavaScript (browser)',
           code: [
@@ -352,14 +349,13 @@
           cls: 'confirmed',
           cwe: 'CWE-79 (DOM-based, Type 0)',
           worked: [
-            'Trace: the source and the sink are both in the browser. Server-side encoding cannot see this flow, so the fix belongs in the client code.',
-            'For plain text, use a text sink such as textContent: it creates a text node without parsing HTML. Do not pre-encode the value first or the entities will be shown literally.',
-            'Partial escaping and the wrong encoder are the usual bugs: replacing only the first "<" leaves the rest, and URL-encoding is for URL components, not HTML.',
+            'Evidence: location.search and innerHTML are both in the browser, so server-side encoding never sees this flow. The fix belongs in welcome.js.',
+            'textContent never parses HTML, so do not pre-encode. Replacing only the first "<" leaves the rest, and URL-encoding is for URLs, not HTML.',
           ],
           model: {
             impact: 'A crafted link runs script in our origin for any signed-in user who opens it.',
-            ticket: 'In welcome.js write the greeting with textContent; add a lint rule rejecting innerHTML with non-constant values.',
-            verification: "Name Ana O'Neil & co displays exactly; the double-< img payload shows as text; no element is created from the parameter.",
+            ticket: 'Write the welcome.js greeting with textContent; lint against innerHTML with non-constant values.',
+            verification: "Ana O'Neil & co displays exactly; the double-< img payload shows as text and creates no element.",
           },
           fix: {
             regressions: [
@@ -401,17 +397,17 @@
       nav: 'OS commands',
       cwe: 'CWE-78',
       title: 'OS command injection',
-      intro: 'Untrusted text that reaches a shell can add commands. Removing the shell stops that, but the program you call may still read user text as options.',
+      intro: 'A shell lets input add commands. Without a shell, the program can still read input as options.',
       links: [
         ['MITRE CWE-78: OS Command Injection', SRC.cwe78],
         ['MITRE CWE-88: Argument Injection', SRC.cwe88],
         ['OWASP OS Command Injection Defense Cheat Sheet', SRC.cmd],
       ],
       basics: {
-        lesson: 'Skip the shell, and only accept values you expect, so input cannot add commands or options.',
-        problem: 'An internal support page checks that a server is up by running the ping program. The server name, such as web-1, comes from the web address, and the code glues it onto a command line.',
-        why: 'Here the input is the host text, and the sink is exec(), which hands the whole line to a shell. To a shell, ";" means "now run another command", so extra text becomes extra commands. Text that starts with "-" can also turn into ping options.',
-        works: 'The fixed code only accepts server names from its own list and answers 400 to anything else. execFile() then starts ping directly, with no shell, and passes the name as one argument, so nothing in it can start another command.',
+        lesson: 'Skip the shell and accept only values you expect.',
+        problem: 'The status page reads host from the URL and appends it to a ping command run by a shell. A host with ";" adds a second command; one starting with "-" adds ping options.',
+        line: 'exec() hands the whole line to a shell, which runs each ";"-separated part as a command.',
+        works: 'Only hosts on the server\'s list get through; anything else gets 400. execFile() then runs ping with no shell, passing host as one argument.',
         unsafe: {
           code: "const host = req.query.host;   // \"web-1\"\nexec('ping -c 1 ' + host);",
           hot: 1,
@@ -450,8 +446,8 @@
         {
           id: 'm78-lookup',
           title: 'Support tool: hostname lookup',
-          scenario: 'Support staff paste a customer hostname to check that it resolves.',
-          alert: { rule: 'js/shell-command-from-request', severity: 'Critical', location: 'tools/netcheck.js:4', message: 'Query parameter concatenated into child_process.exec command line.' },
+          scenario: 'Support staff paste a customer hostname to check it resolves.',
+          alert: { rule: 'js/shell-command-from-request', severity: 'Critical', location: 'tools/netcheck.js:4', message: 'Query parameter concatenated into an exec command line.' },
           lang: 'JavaScript (Node/Express)',
           code: [
             '// tools/netcheck.js',
@@ -466,14 +462,13 @@
           cls: 'confirmed',
           cwe: 'CWE-78 (OS Command Injection)',
           worked: [
-            'Trace: host is concatenated into a command line that /bin/sh parses, so ; $( ) | && and backticks start new commands with the app\'s privileges.',
-            'Best fix: avoid the OS command. A DNS lookup is available as a library call (dns.promises.lookup). If a command is unavoidable, run a fixed executable directly with an argument array and validate each argument for that program.',
-            'Running without a shell is not enough by itself: in the -timeout=3600 fixture nslookup reads the value as an option that changes its resolver timeout policy, not as a hostname. That is argument injection (CWE-88).',
+            'Evidence: req.query.host is concatenated into exec, which runs /bin/sh, so ; $( ) | && and backticks start new commands as the app user.',
+            'Best fix: no OS command; dns.promises.lookup does the job. Dropping the shell alone is not enough: nslookup reads -timeout=3600 as an option, not a hostname (argument injection, CWE-88).',
           ],
           model: {
-            impact: 'Arbitrary commands as the web app user: read secrets, pivot to internal hosts, tamper with the deployment.',
-            ticket: 'Replace exec(nslookup) with dns.promises.lookup after hostname validation (letters, digits, hyphens, dots, max 253; no leading "-"). Return 400 on invalid input.',
-            verification: 'status.example.com resolves; ; and $( ) payloads and option-shaped input return 400; no child_process import remains in netcheck.js.',
+            impact: 'Arbitrary commands as the app user: read secrets, pivot to internal hosts, tamper with the deployment.',
+            ticket: 'Replace exec(nslookup) with dns.promises.lookup after hostname validation (letters, digits, hyphens, dots, max 253, no leading "-"); 400 otherwise.',
+            verification: 'status.example.com resolves; ;, $( ) and option-shaped input get 400; netcheck.js no longer imports child_process.',
           },
           fix: {
             regressions: [
@@ -526,8 +521,8 @@
         {
           id: 'm78-gitlog',
           title: 'Release notes: git history without a shell',
-          scenario: 'A logged-in user picks a release tag; the server returns the last 50 commit subjects. No shell is involved.',
-          alert: { rule: 'js/process-arg-from-request', severity: 'High', location: 'notes.js:5', message: 'Request value passed as process argument.' },
+          scenario: 'A user picks a release tag and gets the last 50 commit subjects. No shell is involved.',
+          alert: { rule: 'js/process-arg-from-request', severity: 'High', location: 'notes.js:5', message: 'Request value passed as a process argument.' },
           lang: 'JavaScript (Node/Express)',
           code: [
             '// notes.js',
@@ -544,14 +539,13 @@
           cls: 'confirmed',
           cwe: 'CWE-88 (Argument Injection), related to CWE-78',
           worked: [
-            'Trace: no shell exists here, so ; and $( ) are inert. But git parses its own argv: a ref that begins with "-" is read as an option. git log accepts --output=<file>, so one argument can write the log over a file the app user can write.',
-            'MITRE separates this as CWE-88: the attacker cannot start a new command but changes what the intended command does. Moving from exec to execFile fixes CWE-78 and leaves CWE-88.',
-            'Fix: validate the argument against what this program should accept (here, known release tags), keep option flags fixed in code, and pass --end-of-options before the user value where the tool supports it.',
+            'Evidence: execFile passes ref unchecked into git\'s argv. With no shell, ; and $( ) are inert, but a ref starting with "-" is an option: --output=<file> writes the log over any file the app user can write.',
+            'That is CWE-88: the attacker changes what the intended command does instead of starting a new one. Allowlist known tags, keep flags fixed in code, and pass --end-of-options before ref.',
           ],
           model: {
-            impact: 'Arbitrary file overwrite as the app user, e.g. replacing a public page or config file, and possible further code execution.',
-            ticket: 'In /notes accept only refs present in the cached tag list; pass ["log","--oneline","-n","50","--end-of-options", ref]; 400 otherwise.',
-            verification: 'v2.4.1 returns notes; --output=... and any value starting with "-" return 400; no file is written outside the expected flow.',
+            impact: 'Overwrite any file the app user can write, such as a public page or config, with possible code execution.',
+            ticket: 'In /notes accept only refs in the cached tag list; pass ["log","--oneline","-n","50","--end-of-options", ref]; 400 otherwise.',
+            verification: 'v2.4.1 returns notes; --output=... and any value starting with "-" get 400; no file is written.',
           },
           fix: {
             regressions: [
@@ -596,16 +590,16 @@
       nav: 'Path traversal',
       cwe: 'CWE-22',
       title: 'Path traversal',
-      intro: 'A user-influenced name becomes a file path. Check relative ../ sequences, absolute paths, extra decoding, sibling directories that share a prefix, and links that point outside.',
+      intro: 'Check ../, absolute paths, extra decoding, sibling folders that share a prefix, and links that point outside.',
       links: [
         ['MITRE CWE-22: Improper Limitation of a Pathname to a Restricted Directory', SRC.cwe22],
         ['OWASP Path Traversal', SRC.path],
       ],
       basics: {
-        lesson: 'Do not build file paths from user text. Look the name up in a list the server controls.',
-        problem: 'A download page sends a file by name, such as ?name=report.pdf, from the folder /srv/files.',
-        why: 'Here the input is the name in the web address, and the sink is the file path that path.join() builds and sendFile() opens. Each "../" in a path means "go up one folder", so a name can climb out of /srv/files and download any file the server can read.',
-        works: 'The fixed code never builds a path from user text. It looks the name up in a list the server wrote. A name that is not on the list gets 404, and the path comes only from the server\'s own entry.',
+        lesson: 'Do not build file paths from user text; look names up in a server-owned list.',
+        problem: 'The download page joins name from the URL onto /srv/files and sends that file. Each ../ climbs one folder, so name can reach any file the server can read.',
+        line: 'path.join() resolves ../ in name, so the path sendFile() opens can leave /srv/files.',
+        works: 'name is only a lookup key: unknown names get 404, and the path comes from the server\'s own entry.',
         unsafe: {
           code: "const file = path.join('/srv/files', req.query.name);\nres.sendFile(file);",
           hot: 0,
@@ -638,8 +632,8 @@
         {
           id: 'm22-invoice',
           title: 'Invoice download',
-          scenario: 'Customers download invoice PDFs by name. The framework already percent-decodes query values once.',
-          alert: { rule: 'js/path-from-request', severity: 'High', location: 'files.js:6', message: 'Query parameter used to build a file path for fs.readFile.' },
+          scenario: 'Customers download invoice PDFs by name. The framework already decodes query values once.',
+          alert: { rule: 'js/path-from-request', severity: 'High', location: 'files.js:6', message: 'Query parameter builds a file path for fs.readFile.' },
           lang: 'JavaScript (Node/Express)',
           code: [
             '// files.js',
@@ -656,15 +650,14 @@
           cls: 'confirmed',
           cwe: 'CWE-22 (Path Traversal)',
           worked: [
-            'Trace: file comes from the URL, is decoded a second time, and path.resolve joins it to BASE. ../ climbs out, and an absolute path makes path.resolve discard BASE entirely.',
-            'Decode exactly once (the framework already did) and reject anything malformed or still encoded; a second decode turns %252e%252e%252f into ../ after validation would have looked.',
-            'Best: do not take paths from users. Look up a server-managed ID that belongs to this customer. If a name is unavoidable, resolve the real path (following links) and check containment by path components (path.relative must not start with ..), not by string prefix: /srv/invoices-archive starts with /srv/invoices.',
-            'Caveat: a link swapped between the check and the read (TOCTOU) defeats a realpath check. Do not let users create links in the store, and open files with no-follow / directory-relative APIs where available.',
+            'Evidence: file is decoded a second time and passed to path.resolve(BASE, …). ../ climbs out, an absolute path replaces BASE, and the extra decode turns %252e%252e%252f into ../.',
+            'Best: look up a server-managed invoice ID owned by this customer. If a name is unavoidable, decode once, take the realpath, and check containment with path.relative, not a string prefix: /srv/invoices-archive starts with /srv/invoices.',
+            'Caveat: a link swapped between check and read (TOCTOU) beats realpath. Do not let users create links, and use no-follow APIs where available.',
           ],
           model: {
             impact: 'Read any file the app user can read: other customers\' invoices, .env secrets, source, system files.',
-            ticket: 'Replace ?file= with ?id= mapped to invoice rows owned by req.user; read path.join(BASE, row.storedName). Remove the extra decodeURIComponent.',
-            verification: 'Own invoice downloads; relative, absolute, double-encoded, sibling-prefix, symlink and malformed inputs return 404/400; another customer\'s id returns 404.',
+            ticket: 'Replace ?file= with ?id= mapped to invoices owned by req.user; read path.join(BASE, row.storedName); drop the extra decodeURIComponent.',
+            verification: 'Own invoice downloads; relative, absolute, double-encoded, sibling-prefix, symlink and malformed inputs get 404/400; another customer\'s id gets 404.',
           },
           fix: {
             regressions: [
@@ -772,19 +765,19 @@
       cls: 'confirmed',
       cwe: 'CWE-95 (Eval Injection), a child of CWE-94',
       worked: [
-        'eval with {} globals still gets __builtins__, so __import__("os").system(...) runs. Any analyst account becomes code execution on the reporting host.',
-        'Replace with a small arithmetic parser over known column names, or a fixed set of named computations.',
+        'Evidence: request.json["formula"] goes straight to eval, and empty {} globals still get __builtins__, so __import__("os").system(...) runs.',
+        'Use a small arithmetic parser over known columns instead.',
       ],
       model: {
         impact: 'Code execution on the reporting service with its database credentials.',
-        ticket: 'Replace eval in add_column with a parser that accepts numbers, row field names from the report schema and + - * / ( ).',
-        verification: "row['qty'] * row['price'] still computes; __import__ and attribute access return 400.",
+        ticket: 'Replace eval with a parser for numbers, report fields and + - * / ( ).',
+        verification: "row['qty'] * row['price'] still computes; __import__ and attribute access get 400.",
       },
     },
     {
       id: 'q-comments',
       title: 'Case 2 · discussion widget',
-      scenario: 'Comments written by other users are loaded and listed under an article.',
+      scenario: 'Other users\' comments are loaded and listed under an article.',
       alert: { rule: 'taint/api-to-dom', severity: 'Medium', location: 'public/comments.js:4', message: 'API response field written to the page.' },
       lang: 'JavaScript (browser)',
       code: [
@@ -801,13 +794,13 @@
       cls: 'confirmed',
       cwe: 'CWE-79 (stored, rendered by DOM code)',
       worked: [
-        'Comments are stored once and replayed to every reader. innerHTML parses author and body as markup, so a comment containing an img onerror runs in each reader\'s session.',
-        'Build the bold name with createElement("b") + textContent and append the body with a text node. Only if comments are meant to be rich HTML, use a maintained sanitizer.',
+        'Evidence: li.innerHTML parses c.author and c.body, which other users stored, so an img onerror comment runs for every reader. Our own API still returns their text.',
+        'Build nodes with textContent; use a sanitizer only if comments are meant to be rich HTML.',
       ],
       model: {
-        impact: 'Script runs for every reader of the thread: account actions and data theft at scale.',
-        ticket: 'In comments.js construct nodes with createElement/textContent; ban innerHTML for API data.',
-        verification: 'A comment "<img src=x onerror=alert(1)>" shows as text; normal comments with & and < display exactly.',
+        impact: 'Script runs for every reader: account actions and data theft at scale.',
+        ticket: 'Build comment nodes with createElement/textContent; ban innerHTML for API data.',
+        verification: 'A comment "<img src=x onerror=alert(1)>" shows as text; & and < display exactly.',
       },
     },
     {
@@ -833,19 +826,19 @@
       cls: 'false-positive',
       cwe: 'Rule maps to CWE-22; not exploitable here (false positive)',
       worked: [
-        'The scanner treated req.user as tainted. The evidence shows avatarId is only written by upload.js with randomUUID, constrained by a database CHECK, and no route accepts it from the client. That is the server-managed ID pattern.',
-        'Close as false positive with that evidence; keep a regression test that avatarId cannot be set through profile update.',
+        'Evidence: only upload.js writes avatarId (randomUUID), a CHECK enforces uuid format, and no route accepts it from the client.',
+        'The scanner wrongly treated req.user as tainted. Close as false positive citing that evidence.',
       ],
       model: {
-        impact: 'None with current code: the user cannot influence the path segment.',
-        ticket: 'Close as false positive; add a test asserting PATCH /me ignores avatarId and a scanner suppression citing upload.js.',
-        verification: 'Test proves avatarId is unchanged after a PATCH containing avatarId="../../etc/passwd"; DB CHECK rejects non-UUID values.',
+        impact: 'None: the user cannot influence the path segment.',
+        ticket: 'Close with a scanner suppression citing upload.js; add a test that PATCH /me ignores avatarId.',
+        verification: 'avatarId is unchanged after PATCH avatarId="../../etc/passwd"; the CHECK rejects non-UUIDs.',
       },
     },
     {
       id: 'q-thumbs',
       title: 'Case 4 · media worker',
-      scenario: 'A background worker makes thumbnails for jobs queued by another service.',
+      scenario: 'A worker makes thumbnails for jobs queued by another service.',
       alert: { rule: 'taint/format-to-process', severity: 'High', location: 'jobs/thumbs.py:4', message: 'Formatted string passed to a process call.' },
       lang: 'Python',
       code: [
@@ -863,19 +856,19 @@
       cls: 'needs-evidence',
       cwe: 'Would be CWE-78 if users influence the paths; evidence missing',
       worked: [
-        'The sink is dangerous (a shell parses the formatted string), but whether an attacker controls src_path is decided in media-ingest, which this review cannot see. Confirming or dismissing would be a guess.',
-        'Request the ingest code path for src_path (does it keep the upload filename?) and sample queued jobs. Meanwhile, recommend list arguments without shell=True as cheap hardening.',
+        'Evidence: shell=True makes the call dangerous, but src_path is set in media-ingest, which this review cannot see. Either verdict would be a guess.',
+        'Ask for the ingest code and sample jobs; meanwhile, pass an argument list without shell=True.',
       ],
       model: {
         impact: 'If upload filenames reach src_path: command execution on the media worker. If not: none.',
-        ticket: 'Ask media-ingest owners how src_path is generated and attach samples; hardening: the worker builds src/dst itself as absolute paths under a fixed media directory from server-generated names (e.g. uuid + .png, so no argument can start with "-"), validates them, and calls subprocess.run(["/usr/bin/convert", src, "-resize", "256x256", dst]) without shell=True.',
-        verification: 'Evidence shows the path origin; a job with src_path "a.png;id" is rejected or handled as a literal file name.',
+        ticket: 'Ask media-ingest how src_path is built. Hardening: build src/dst from server names (uuid + .png, never starting with "-") under a fixed media directory and pass an argument list to subprocess.run without shell=True.',
+        verification: 'Evidence shows where src_path comes from; src_path "a.png;id" is rejected or treated as a literal name.',
       },
     },
     {
       id: 'q-uptime',
       title: 'Case 5 · on-call console',
-      scenario: 'On-call engineers check uptime of a fleet host typed into a form. No shell is used.',
+      scenario: 'On-call engineers type a fleet host to check its uptime. No shell is used.',
       alert: { rule: 'taint/request-to-process-arg', severity: 'Medium', location: 'fleet.js:5', message: 'Request value passed as process argument.' },
       lang: 'JavaScript (Node/Express)',
       code: [
@@ -893,13 +886,13 @@
       cls: 'confirmed',
       cwe: 'CWE-88 (Argument Injection), related to CWE-78',
       worked: [
-        'execFile avoids the shell, but ssh reads its own options. host = -oProxyCommand=sh -c "id>/tmp/p" makes ssh run that proxy command locally, without any shell metacharacter parsing by Node.',
-        'Accept only hostnames from the fleet inventory, reject leading "-", and keep options fixed in code.',
+        'Evidence: execFile avoids the shell, but req.body.host goes unchecked into ssh\'s argv, so -oProxyCommand=sh -c "id>/tmp/p" makes ssh run a local command.',
+        'Accept only fleet inventory hostnames and keep options fixed in code.',
       ],
       model: {
         impact: 'Command execution on the console host via ssh ProxyCommand; access to its SSH keys.',
-        ticket: 'In /fleet/uptime look up host in the inventory and pass the inventory value; 400 for unknown hosts.',
-        verification: 'web-03.internal works; -oProxyCommand=... and any value starting with "-" return 400.',
+        ticket: 'Look host up in the fleet inventory and pass the inventory value; 400 for unknown hosts.',
+        verification: 'web-03.internal works; -oProxyCommand=... and any value starting with "-" get 400.',
       },
     },
   ];

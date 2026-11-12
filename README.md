@@ -6,10 +6,10 @@ A static workbench for learning four weaknesses and practising scanner-alert tri
 
 1. Pick a weakness in the left sidebar (on phones, the **☰ Modules** button opens it). The lab opens on CWE-94.
 2. Read the lesson from top to bottom, in one column:
-   1. **Understand the problem**: a plain-English example, what *input*, *code* and *sink* mean, and why this example is unsafe.
-   2. **Read the unsafe code**: the tiny **✗ Unsafe** snippet.
+   1. **Understand the problem**: one or two sentences: where the input comes from, the operation that uses it, and the impact.
+   2. **Read the unsafe code**: a one-line note on the dangerous line, then the tiny **✗ Unsafe** snippet. CWE-94 defines *sink* here once (the operation that uses the input); the other modules just say *operation*.
    3. **Follow one input**: press **Step through input** to send a harmful input through the unsafe code one stage at a time. The trace runs down the page, Input → Operation → Result, lights the dangerous line and labels the outcome *Works*, *Harmful effect* or *Blocked*. Nothing animates until you press it.
-   4. **See the fix**: the **✓ Fixed** snippet, why it works, and the one-line rule.
+   4. **See the fix**: a one-line note on the protecting line, the **✓ Fixed** snippet, and the one-line rule.
 3. Optional: open **Try another input or code** to choose an ordinary or harmful input and the unsafe or fixed code, then press **Run** (animated) or **Replay**. The trace in step 3 shows the result. Outcomes are predefined text. Nothing is executed. With reduced motion turned on in the operating system, Run shows the result at once.
 4. Open **Practice triage** when you are ready for the full scanner-alert exercises described below. It starts closed and reopens on its own once you have saved a draft or submission for that module. A closed **Sources** disclosure follows at the end; open it for the module's references.
 
@@ -17,7 +17,7 @@ The **Mixed queue** has no beginner lesson, because the lesson would name each c
 
 ## Practice triage
 
-For each alert you record the untrusted source, the dangerous operation, the missing control, a classification, and written rationale, impact, remediation ticket and verification criteria. Feedback and the worked answer appear only after every field is filled in. Your rationale, impact, ticket and verification are not machine-graded: compare your own text with the worked answer. Only the three trace choices and the classification are scored. Module exercises then open a remediation drill: the vulnerable and candidate-fixed code side by side, plus predefined regression outcomes for ordinary and exploit inputs.
+For each alert you record the untrusted source, the dangerous operation, the missing control, a classification, and written rationale, impact, remediation ticket and verification criteria. Feedback and the worked answer appear only after every field is filled in; the reasoning starts with the evidence in the shown code. Only the three trace choices and the classification are scored. Compare your rationale, impact, ticket and verification with the model answer yourself. Module exercises then open a remediation drill: the vulnerable and candidate-fixed code side by side, plus predefined regression outcomes for ordinary and exploit inputs.
 
 ## Run locally
 
@@ -33,6 +33,8 @@ Plain HTML/CSS/JS, no build step, no dependencies, no backend.
 ```sh
 node tests.cjs   # static data, beginner blocks, validation, fonts and sink checks (no dependencies)
 ```
+
+Two tests read the pre-quick-copy baseline (`git show 78a52056…:data.js`, read-only) to prove that only learner prose changed and that it got shorter; they print before/after word counts. They need the git history.
 
 The repository does not include a browser regression harness. One is maintained outside the source tree (`cwe-triage-lab-ops/browser.cjs`, Playwright and Chromium). It takes `node browser.cjs [BASE_URL] [SCREENSHOT_DIR]`.
 
@@ -61,7 +63,7 @@ Edit `data.js`:
    - `source`, `sink` and `control`, each as `{ options: [...], answer: index }`. Options render in authored order, so put the correct one at varying positions; `node tests.cjs` fails if one position holds most answers.
    - `cls`: one of `confirmed`, `false-positive` or `needs-evidence`.
    - `cwe`: revealed only after submission.
-   - `worked`: an array of paragraphs.
+   - `worked`: an array of one or two short paragraphs. The first starts with `Evidence:` and cites what in the shown code supports the classification.
    - `model: { impact, ticket, verification }`.
 3. Module exercises also need a `fix`:
    - `regressions`: `[{ kind: 'Ordinary' | 'Exploit', input }]`.
@@ -74,8 +76,8 @@ Edit `data.js`:
 
 Each module also has `basics` (the queue must not have one):
 
-- `lesson`: one sentence, 140 characters at most.
-- `problem`, `why` and `works`: short plain-English paragraphs for steps 1 and 4: the example feature, why it is unsafe (naming this example's input and sink as "the input is … the sink is …"), and why the fix works.
+- `lesson`: the one-line rule, 100 characters at most.
+- `problem`, `line` and `works`: one or two short sentences each. `problem` (step 1) names the input source, the operation and the impact. `line` (step 2) explains the dangerous line; `works` (step 4) explains how the protecting line stops it. The UI prefixes both with the line number.
 - `unsafe` and `fixed`: `{ code, hot }`. `code` is 2–5 lines (unsafe) or 2–6 lines (fixed). `hot` is the 0-based index of the dangerous line or the protective line that the trace lights up.
 - `samples`: `[{ kind: 'Ordinary' | 'Harmful', input, unsafe: { op, out, effect }, fixed: { op, out, effect } }]`. `effect` is `ok`, `harm` or `blocked`. Step 3 starts on the first `Harmful` sample. Ordinary samples must be `ok` both ways. Harmful samples must be `harm` unsafe and `blocked` fixed.
 - The fix must really remove the weakness. `node tests.cjs` checks the toy fixes for these patterns: no eval, plus a validated fixed handler; `textContent`; no shell, plus an allowlist; a server-side `Map` lookup instead of joining request text.
@@ -86,11 +88,12 @@ Removing or renaming an exercise id makes older saved progress fail validation. 
 
 ## Fonts
 
-The colours and type follow <http://git.marcuschiu.com/thoughts/>: Newsreader (500 normal and italic) for headings and JetBrains Mono (400) for everything else. The three font files are served locally from `fonts/`, so the Content-Security-Policy stays `'self'` and the lab makes no external requests. Only these weights ship, and `font-synthesis: none` stops the browser from faking bold.
+The colours follow <http://git.marcuschiu.com/thoughts/>. For readability, headings and body use Source Sans 3 (variable, normal style, weights 200–900) at 17px, and code uses IBM Plex Mono (400). System fonts are the fallback. The two font files are served locally from `fonts/`, so the Content-Security-Policy stays `'self'` and the lab makes no external requests. No italic ships, and `font-synthesis: none` stops the browser from faking styles.
 
-- JetBrains Mono, Copyright 2020 The JetBrains Mono Project Authors. SIL Open Font License 1.1: `fonts/jetbrainsmono-OFL.txt`.
-- Newsreader, Copyright 2020 The Newsreader Project Authors. SIL Open Font License 1.1: `fonts/newsreader-OFL.txt`.
-- The files are the Google Fonts static instances (`fonts.gstatic.com`, JetBrains Mono v24, Newsreader v26).
+- Source Sans 3, Copyright 2010–2020 Adobe. SIL Open Font License 1.1: `fonts/sourcesans3-OFL.txt`.
+- IBM Plex Mono, Copyright © 2017 IBM Corp. SIL Open Font License 1.1: `fonts/ibmplexmono-OFL.txt`.
+- The files are the upstream Google Fonts repository files `ofl/sourcesans3/SourceSans3[wght].ttf` and `ofl/ibmplexmono/IBMPlexMono-Regular.ttf`.
+- The earlier JetBrains Mono and Newsreader files and their licenses are still in `fonts/` but are no longer loaded.
 
 ## Sources
 

@@ -15,7 +15,7 @@
   const FIELDS = [...CHOICES.map((c) => c[0]), 'cls', ...TEXTS.map((t) => t[0])];
   const MIN_TEXT = 12;
   const MAX_TEXT = 4000;
-  const UNGRADED = 'Your rationale, impact, ticket and verification are not machine-graded: compare your own text with the worked answer. Only the three trace choices and the classification are scored.';
+  const UNGRADED = 'Only the three trace choices and the classification are scored. Compare your rationale, impact, ticket and verification with the model answer yourself.';
 
   const allExercises = (lab) => [...lab.modules.flatMap((m) => m.exercises), ...lab.queue];
   const emptyState = () => ({ version: VERSION, view: '', drafts: {}, submitted: {}, fixes: {} });
@@ -141,8 +141,8 @@
   // Same generic strategy for every exercise: it must never name a classification, weakness or answer.
   const TRACE_HINT = () => h('details', { class: 'hint' },
     h('summary', {}, 'Trace hint'),
-    h('p', {}, 'Follow the data in three steps: where outside input enters, what transforms or checks it on the way, and the operation that would be dangerous if that input reached it.'),
-    h('p', {}, 'Then separate what the code shown proves from what it does not show. A control you cannot see here is missing evidence to ask for, not proof either way.'));
+    h('p', {}, 'Find where outside input enters, what checks it on the way, and the operation that would be dangerous if it arrived.'),
+    h('p', {}, 'A control not shown here is missing evidence, not proof either way.'));
 
   const codeBlock = (label, text) => h('pre', { class: 'code', tabindex: 0, 'aria-label': label }, h('code', {}, text));
 
@@ -187,7 +187,7 @@
       e.preventDefault();
       const missing = missingFields(d, ex);
       if (missing.length) {
-        errors.textContent = 'Complete every field before feedback is shown. Missing: ' + missing.join(', ') + '. Text answers need at least ' + MIN_TEXT + ' characters.';
+        errors.textContent = 'Fill every field to see feedback. Missing: ' + missing.join(', ') + '. Text answers need at least ' + MIN_TEXT + ' characters.';
         const labels = Object.fromEntries([...CHOICES, ...TEXTS, ['cls', 'Classification']].map(([k, l]) => [l, k]));
         for (const l of missing) document.getElementById(fid(labels[l])).setAttribute('aria-invalid', 'true');
         const first = document.getElementById(fid(labels[missing[0]]));
@@ -200,7 +200,7 @@
       document.getElementById(fid('feedback-h')).focus();
     } },
     choiceFields, clsField, textFields, errors,
-    done ? h('p', { class: 'locked' }, 'Submitted. Answers are locked so feedback stays matched to them.') : h('button', { type: 'submit' }, 'Submit triage'));
+    done ? h('p', { class: 'locked' }, 'Submitted. Answers are locked to match the feedback.') : h('button', { type: 'submit' }, 'Submit triage'));
 
     return h('section', { class: 'exercise', id: ex.id, 'aria-labelledby': fid('h') },
       h('h3', { id: fid('h') }, ex.title),
@@ -314,7 +314,7 @@
         lines[k][b[k].hot].classList.toggle('lit', demo.mode === k && demo.step >= 2);
       }
       status.textContent = done ? 'Result: ' + EFFECT[s[demo.mode].effect] + '.' : demo.step ? 'Step ' + demo.step + ' of 3.'
-        : 'Ready: the ' + s.kind.toLowerCase() + ' input "' + s.input + '" goes into the ' + demo.mode + ' code. Press Step through input.';
+        : 'Ready: ' + s.kind.toLowerCase() + ' input "' + s.input + '" into the ' + demo.mode + ' code.';
     }
     const reset = () => { stopTimer(); demo.step = 0; paint(); };
     function run(from) {
@@ -332,7 +332,6 @@
     const part = (n, title, ...kids) => h('section', { class: 'step', id: fid('part-' + n), 'aria-labelledby': fid('part-' + n + '-h') },
       h('h3', { id: fid('part-' + n + '-h') }, n + '. ' + title), ...kids);
     const step3 = part(3, 'Follow one input',
-      h('p', {}, 'Send one input through the code and watch each stage: the input, what the sink does with it, and the result.'),
       h('div', { class: 'actions' },
         h('button', { type: 'button', id: fid('step'), onclick: () => { stopTimer(); demo.step = demo.step >= 3 ? 1 : demo.step + 1; paint(); } }, 'Step through input')),
       h('ol', { class: 'trace', 'aria-label': 'Data trace' }, slots.map((x) => x.li)),
@@ -342,26 +341,19 @@
     const runFrom = (from) => { run(from); step3.scrollIntoView({ block: 'start' }); };
 
     const section = h('section', { class: 'basics', 'aria-label': 'Beginner lesson' },
-      part(1, 'Understand the problem',
-        h('p', {}, b.problem),
-        h('dl', { class: 'terms' },
-          h('dt', {}, 'Input'), h('dd', {}, 'Text that comes from outside the app, such as a web address or a form field. Anyone can change it.'),
-          h('dt', {}, 'Code'), h('dd', {}, 'The instructions the app runs.'),
-          h('dt', {}, 'Sink'), h('dd', {}, 'The operation in the code that uses the input, such as running it, showing it on a page, starting a command or opening a file.')),
-        h('p', {}, b.why)),
+      part(1, 'Understand the problem', h('p', {}, b.problem)),
       part(2, 'Read the unsafe code',
-        h('p', {}, 'This is the whole unsafe example. The sink is on line ' + (b.unsafe.hot + 1) + '.'),
+        h('p', {}, 'Line ' + (b.unsafe.hot + 1) + ': ' + b.line),
         figs.unsafe),
       step3,
       part(4, 'See the fix',
-        h('p', {}, 'The same feature, written safely. The line that protects it is line ' + (b.fixed.hot + 1) + '.'),
+        h('p', {}, 'Line ' + (b.fixed.hot + 1) + ': ' + b.works),
         figs.fixed,
-        h('p', {}, b.works),
         h('p', { class: 'lesson' }, b.lesson)),
       h('details', { class: 'try', id: fid('try') },
         h('summary', {}, 'Try another input or code'),
         h('div', { role: 'group', 'aria-label': 'Try it: predefined outcomes, nothing is executed' },
-          h('p', {}, 'Choose an input and the code to send it through, then press Run. The trace in step 3 shows what happens.'),
+          h('p', {}, 'The result shows in the step 3 trace.'),
           choice('sample', 'Input', b.samples.map((s, i) => [i, s.kind + ': ' + s.input]), 'sample'),
           choice('mode', 'Code', [['unsafe', 'Unsafe'], ['fixed', 'Fixed']], 'mode'),
           h('div', { class: 'actions' },
@@ -399,7 +391,7 @@
       const n = LAB.queue.filter((q) => state.submitted[q.id]).length;
       main.append(
         h('h2', {}, 'Mixed triage queue'),
-        h('p', { class: 'intro' }, 'Alerts from different services. Decide each on the evidence shown. The mapped weakness appears only after you submit. ' + n + ' of ' + LAB.queue.length + ' submitted.'),
+        h('p', { class: 'intro' }, 'Decide each alert on the evidence shown. The weakness is named after you submit. ' + n + ' of ' + LAB.queue.length + ' submitted.'),
         ...LAB.queue.map(renderExercise));
     } else {
       const m = LAB.modules.find((x) => x.id === view);

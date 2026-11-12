@@ -20,12 +20,13 @@ const env = (o) => JSON.stringify({ version: VERSION, view: '', drafts: {}, subm
 
 test('four modules in the required order', () => assert.deepEqual(LAB.modules.map((m) => m.cwe), ['CWE-94', 'CWE-79', 'CWE-78', 'CWE-22']));
 
-test('every module has a beginner block: problem, why, fix explanation, tiny unsafe + fixed snippet, ordinary and harmful samples', () => {
+test('every module has a beginner block: short problem, dangerous-line and fix notes, tiny unsafe + fixed snippet, ordinary and harmful samples', () => {
+  const sentences = (s) => (s.match(/[.!?](?=\s|$)/g) || []).length;
   for (const m of LAB.modules) {
     const b = m.basics;
-    assert.ok(b && b.lesson.length <= 140, m.id + ' short lesson');
-    for (const k of ['problem', 'why', 'works']) assert.ok(typeof b[k] === 'string' && b[k].length >= 60 && b[k].length <= 320, m.id + ' plain-English ' + k);
-    assert.match(b.why, /input is[\s\S]*sink is/, m.id + ' why names this example\'s input and sink');
+    assert.ok(b && b.lesson.length <= 100, m.id + ' short lesson');
+    for (const k of ['problem', 'line', 'works']) assert.ok(typeof b[k] === 'string' && b[k].length >= 40 && b[k].length <= 200 && sentences(b[k]) <= 2, m.id + ' ' + k + ' is 1-2 short sentences');
+    assert.equal(b.why, undefined, m.id + ' old why paragraph removed');
     const lines = (c) => c.split('\n').length;
     assert.ok(lines(b.unsafe.code) >= 2 && lines(b.unsafe.code) <= 5, m.id + ' unsafe 2-5 lines');
     assert.ok(lines(b.fixed.code) >= 2 && lines(b.fixed.code) <= 6, m.id + ' fixed 2-6 lines');
@@ -193,17 +194,101 @@ test('validateEnvelope rejects malformed, future, wrong-type and unsafe shapes',
 });
 
 test('feedback and README disclose that written answers are not machine-graded', () => {
-  assert.match(UNGRADED, /rationale, impact, ticket and verification are not machine-graded: compare your own text with the worked answer/);
+  assert.match(UNGRADED, /^Only the three trace choices and the classification are scored\. Compare your rationale, impact, ticket and verification with the model answer yourself\.$/);
   assert.match(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), /return h\('section', \{ class: 'feedback'[\s\S]*h\('p', \{ class: 'ungraded' \}, UNGRADED\)/);
   assert.ok(fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8').includes(UNGRADED), 'README sentence matches');
 });
 
 test('fonts are local files with licenses; no external URLs in page sources', () => {
   const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
-  for (const f of ['jetbrains-mono-normal-400.ttf', 'newsreader-normal-500.ttf', 'newsreader-italic-500.ttf', 'jetbrainsmono-OFL.txt', 'newsreader-OFL.txt']) assert.ok(fs.existsSync(path.join(__dirname, 'fonts', f)), f);
-  assert.equal((css.match(/@font-face/g) || []).length, 3);
-  assert.doesNotMatch(css, /font-weight:\s*[6-9]00|font-weight:\s*bold/, 'no weight that is not shipped');
+  for (const f of ['source-sans-3.ttf', 'ibm-plex-mono-regular.ttf', 'sourcesans3-OFL.txt', 'ibmplexmono-OFL.txt']) assert.ok(fs.existsSync(path.join(__dirname, 'fonts', f)), f);
+  assert.deepEqual(css.match(/url\([^)]*\)/g), ['url(fonts/source-sans-3.ttf)', 'url(fonts/ibm-plex-mono-regular.ttf)'], 'only the two shipped faces are loaded');
+  assert.match(css, /font-family: 'Source Sans 3'; font-style: normal; font-weight: 200 900;/);
+  assert.match(css, /font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400;/);
+  assert.match(css, /--mono: 'IBM Plex Mono', ui-monospace[^;]*monospace;/);
+  assert.match(css, /--sans: 'Source Sans 3', system-ui[^;]*sans-serif;/);
+  assert.doesNotMatch(css, /italic|oblique|Newsreader|JetBrains|--serif|font-weight:\s*bold/, 'no unshipped italic, bold keyword or old face');
+  assert.match(css, /font-synthesis: none/);
   for (const f of ['style.css', 'index.html']) assert.doesNotMatch(fs.readFileSync(path.join(__dirname, f), 'utf8'), /https?:\/\/(?!cwe\.mitre|owasp)/, f);
+});
+
+test('calculator intro is the exact quick-tutorial copy', () => {
+  assert.equal(LAB.modules[0].basics.problem, 'The calculator reads expr from the URL and passes it to eval(). Anyone who controls expr can make the server run JavaScript.');
+});
+
+test('"sink" is defined once (CWE-94 step 2); no repeated Input/Code/Sink glossary', () => {
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');
+  assert.doesNotMatch(app, /class: 'terms'|Text that comes from outside|The sink is|what the sink does/, 'old per-module definitions');
+  const hits = [];
+  const walk = (o, at) => { if (typeof o === 'string') { if (/\bsinks?\b/i.test(o)) hits.push(at); } else if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) if (!['code', 'sink', 'rule'].includes(k)) walk(v, at + '.' + k); };
+  walk(LAB, 'LAB');
+  assert.deepEqual(hits, ['LAB.modules.0.basics.line'], 'learner prose using "sink"');
+  assert.match(LAB.modules[0].basics.line, /sink, the operation that uses the input/);
+});
+
+// Baseline commit before the quick-copy pass. Read-only: `git show` output is evaluated in a sandbox, nothing is written.
+const BASE_REV = '78a52056ce26c4ec3ec2097dec296196d7bfa659';
+const baseLab = () => {
+  const src = require('node:child_process').execFileSync('git', ['show', BASE_REV + ':data.js'], { cwd: __dirname, encoding: 'utf8' });
+  const sandbox = { module: { exports: {} } };
+  require('node:vm').runInNewContext(src, sandbox);
+  return sandbox.module.exports;
+};
+const PROSE = ['intro', 'problem', 'why', 'line', 'works', 'lesson', 'scenario', 'message', 'worked', 'model'];
+const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (PROSE.includes(k) ? undefined : v)));
+const words = (o, inProse = false) => {
+  if (typeof o === 'string') return inProse ? o.split(/\s+/).filter(Boolean).length : 0;
+  if (!o || typeof o !== 'object') return 0;
+  return Object.entries(o).reduce((n, [k, v]) => n + words(v, inProse || PROSE.includes(k)), 0);
+};
+
+test('only learner prose changed since baseline: code, inputs, outcomes, ids, options, answers, classes, CWEs, fixes, links identical', () => {
+  const base = baseLab();
+  assert.deepEqual(strip(LAB), strip(base));
+  assert.deepEqual(all.map((e) => e.id), [...base.modules.flatMap((m) => m.exercises), ...base.queue].map((e) => e.id), 'ids and case counts');
+  // Saved progress from the baseline still validates.
+  const id = 'm22-invoice';
+  assert.ok(validateEnvelope(env({ view: 'm22', drafts: { [id]: complete(all.find((e) => e.id === id)) }, submitted: { [id]: true }, fixes: { [id]: 3 } }), LAB).ok);
+});
+
+test('prose is shorter in every module and the queue, per exercise too (word counts printed)', () => {
+  const base = baseLab();
+  const units = [...LAB.modules.map((m, i) => [m.id, base.modules[i], m]), ['queue', base.queue, LAB.queue]];
+  let before = 0;
+  let after = 0;
+  for (const [name, b, a] of units) {
+    const [wb, wa] = [words(b), words(a)];
+    before += wb; after += wa;
+    console.log(`     ${name}: ${wb} -> ${wa} words (${Math.round(100 - (100 * wa) / wb)}% shorter)`);
+    assert.ok(wa <= wb * 0.8, name + ' prose cut by at least a fifth');
+  }
+  console.log(`     total learner prose in data.js: ${before} -> ${after} words`);
+  const baseEx = new Map([...base.modules.flatMap((m) => m.exercises), ...base.queue].map((e) => [e.id, e]));
+  for (const ex of all) {
+    const pick = (e) => ({ worked: e.worked, model: e.model });
+    assert.ok(words(pick(ex), true) < words(pick(baseEx.get(ex.id)), true), ex.id + ' feedback shortened');
+  }
+});
+
+test('feedback leads with concrete evidence from the shown code and keeps the security nuance', () => {
+  const by = Object.fromEntries(all.map((e) => [e.id, e]));
+  for (const ex of all) {
+    assert.match(ex.worked[0], /^Evidence:/, ex.id + ' evidence first');
+    const tokens = ex.worked[0].match(/[\w.$]{4,}/g).filter((t) => /[._(]|[a-z][A-Z]/.test(t) || t.length >= 8);
+    assert.ok(tokens.some((t) => ex.code.includes(t.replace(/[.,]$/, ''))), ex.id + ' evidence cites the code shown');
+  }
+  const text = (id) => [...by[id].worked, ...Object.values(by[id].model)].join(' ');
+  assert.match(text('q-avatar'), /randomUUID[\s\S]*CHECK[\s\S]*no route/, 'false positive cites the control evidence');
+  assert.match(text('q-thumbs'), /shell=True[\s\S]*media-ingest[\s\S]*cannot see/, 'needs-evidence names the dangerous call and the missing evidence');
+  assert.match(text('q-columns'), /__builtins__/, 'eval with empty globals');
+  assert.match(text('m94-promo'), /CWE-95[\s\S]*Function constructor[\s\S]*node:vm/);
+  assert.match(text('m79-reflected'), /entity encoding[\s\S]*sanitizer is for rich HTML[\s\S]*URL, JavaScript or CSS/);
+  assert.match(text('m79-stored'), /javascript: URL[\s\S]*http:\/https:[\s\S]*Style values[\s\S]*event-handler/);
+  assert.match(text('m79-dom'), /server-side encoding never sees[\s\S]*textContent[\s\S]*first "<"[\s\S]*URL-encoding/);
+  assert.match(text('m78-lookup'), /\/bin\/sh[\s\S]*dns\.promises\.lookup[\s\S]*-timeout=3600 as an option[\s\S]*CWE-88/);
+  assert.match(text('m78-gitlog'), /no shell[\s\S]*"-" is an option[\s\S]*--end-of-options/);
+  assert.match(text('q-uptime'), /avoids the shell[\s\S]*ProxyCommand[\s\S]*inventory/);
+  assert.match(text('m22-invoice'), /absolute path replaces BASE[\s\S]*%252e[\s\S]*path\.relative, not a string prefix[\s\S]*invoices-archive[\s\S]*TOCTOU/);
 });
 
 test('app.js never uses HTML or code-evaluating sinks', () => {
