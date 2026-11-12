@@ -76,8 +76,14 @@
     return { ok: true, state: d };
   }
 
+  // Beginner trace after `step` of 3: [input, operation, result]; null = not reached, so nothing stale shows.
+  function traceStep(sample, mode, step) {
+    const n = Math.max(0, Math.min(3, step));
+    return [sample.input, sample[mode].op, sample[mode].out].map((v, i) => (i < n ? v : null));
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validateEnvelope, missingFields, grade, KEY, VERSION, FIELDS, MIN_TEXT, UNGRADED };
+    module.exports = { validateEnvelope, missingFields, grade, traceStep, KEY, VERSION, FIELDS, MIN_TEXT, UNGRADED };
     return;
   }
 
@@ -261,6 +267,93 @@
     if (el) el.focus();
   }
 
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const EFFECT = { ok: 'Works', harm: 'Harmful effect', blocked: 'Blocked' };
+  const practiceOpen = new Set(); // in-memory only; not part of the stored envelope
+  let timer = 0;
+  const stopTimer = () => { clearTimeout(timer); timer = 0; };
+
+  // Beginner first screen: tiny unsafe vs fixed snippet plus a user-driven Input -> operation -> result trace.
+  // Outcomes are predefined strings from data.js written with textContent; nothing is executed.
+  function renderBasics(m) {
+    const b = m.basics;
+    const demo = { sample: 0, mode: 'unsafe', step: 0 };
+    const fid = (k) => m.id + '-demo-' + k;
+    const lines = {};
+    const figs = {};
+    for (const [k, label] of [['unsafe', '✗ Unsafe'], ['fixed', '✓ Fixed']]) {
+      const src = b[k].code.split('\n');
+      lines[k] = src.map((t, i) => h('span', { class: i === b[k].hot ? 'line hot' : 'line' }, t));
+      figs[k] = h('figure', { class: 'snippet ' + k, id: fid(k) }, h('figcaption', {}, label),
+        h('pre', { class: 'code', tabindex: 0, 'aria-label': label.slice(2) + ' code' },
+          h('code', {}, lines[k].flatMap((el, i) => (i < src.length - 1 ? [el, '\n'] : [el])))));
+    }
+    const slots = ['Input', 'Operation', 'Result'].map((name, i) => {
+      const v = h('span', { class: 'slot-v' });
+      return { li: h('li', { class: 'slot', id: fid('slot-' + i) }, h('span', { class: 'slot-h' }, (i + 1) + ' · ' + name), v), v };
+    });
+    const effect = h('span', { class: 'effect', id: fid('effect') });
+    slots[2].li.append(effect);
+    const status = h('p', { class: 'demo-status', id: fid('status'), role: 'status' });
+
+    function paint() {
+      const s = b.samples[demo.sample];
+      const vals = traceStep(s, demo.mode, demo.step);
+      const done = demo.step === 3;
+      slots.forEach(({ li, v }, i) => {
+        li.classList.toggle('on', vals[i] !== null);
+        li.classList.toggle('now', i === demo.step - 1);
+        v.textContent = vals[i] === null ? '…' : vals[i];
+      });
+      for (const e of ['ok', 'harm', 'blocked']) slots[2].li.classList.toggle(e, done && s[demo.mode].effect === e);
+      effect.textContent = done ? EFFECT[s[demo.mode].effect] : '';
+      for (const k of ['unsafe', 'fixed']) {
+        figs[k].classList.toggle('active', demo.mode === k);
+        lines[k][b[k].hot].classList.toggle('lit', demo.mode === k && demo.step >= 2);
+      }
+      status.textContent = done ? 'Result: ' + EFFECT[s[demo.mode].effect] + '.' : demo.step ? 'Step ' + demo.step + ' of 3.' : 'Pick a sample and code, then press Run or Step.';
+    }
+    const reset = () => { stopTimer(); demo.step = 0; paint(); };
+    function run(from) {
+      stopTimer();
+      demo.step = from >= 3 ? 0 : from;
+      if (reduceMotion.matches) { demo.step = 3; paint(); return; }
+      const tick = () => { demo.step++; paint(); timer = demo.step < 3 ? setTimeout(tick, 650) : 0; };
+      tick();
+    }
+    const choice = (name, legend, items, key) => h('fieldset', { class: 'seg' }, h('legend', {}, legend),
+      items.map(([v, label]) => h('label', { class: 'radio' },
+        h('input', { type: 'radio', name: fid(name), id: fid(name + '-' + v), value: String(v), checked: demo[key] === v, onchange: () => { demo[key] = v; reset(); } }),
+        ' ', label)));
+
+    const section = h('section', { class: 'basics', 'aria-label': 'Beginner lesson' },
+      h('p', { class: 'lesson' }, b.lesson),
+      h('div', { class: 'compare' }, figs.unsafe, figs.fixed),
+      h('div', { class: 'demo', role: 'group', 'aria-label': 'Try it: predefined outcomes, nothing is executed' },
+        h('h3', {}, 'Try it'),
+        h('div', { class: 'controls' },
+          choice('sample', 'Input', b.samples.map((s, i) => [i, s.kind + ': ' + s.input]), 'sample'),
+          choice('mode', 'Code', [['unsafe', 'Unsafe'], ['fixed', 'Fixed']], 'mode')),
+        h('div', { class: 'actions' },
+          h('button', { type: 'button', id: fid('run'), onclick: () => run(demo.step) }, 'Run'),
+          h('button', { type: 'button', id: fid('step'), class: 'quiet', onclick: () => { stopTimer(); demo.step = demo.step >= 3 ? 1 : demo.step + 1; paint(); } }, 'Step'),
+          h('button', { type: 'button', id: fid('replay'), class: 'quiet', onclick: () => run(0) }, 'Replay')),
+        h('ol', { class: 'trace', 'aria-label': 'Data trace' }, slots.map((x) => x.li)),
+        status,
+        h('p', { class: 'muted small' }, 'Outcomes are written in advance. Nothing is executed.')));
+    paint();
+    return section;
+  }
+
+  function renderPractice(m) {
+    const n = m.exercises.filter((e) => state.submitted[e.id]).length;
+    const started = m.exercises.some((e) => state.submitted[e.id] || Object.keys(state.drafts[e.id] || {}).length);
+    return h('details', { class: 'practice', open: started || practiceOpen.has(m.id), ontoggle: (e) => { if (e.target.open) practiceOpen.add(m.id); else practiceOpen.delete(m.id); } },
+      h('summary', {}, 'Practice triage ', h('span', { class: 'muted' }, '· ' + m.exercises.length + (m.exercises.length > 1 ? ' scanner alerts' : ' scanner alert'))),
+      h('p', { class: 'intro' }, m.intro + ' ' + n + ' of ' + m.exercises.length + ' submitted.'),
+      ...m.exercises.map(renderExercise));
+  }
+
   function currentView() {
     const v = location.hash.slice(1);
     if (v === 'queue' || LAB.modules.some((m) => m.id === v)) return v;
@@ -269,6 +362,7 @@
 
   function render() {
     const view = currentView();
+    stopTimer(); // a running demo never paints into a replaced view
     if (state.view !== view) { state.view = view; save(); }
     for (const a of document.querySelectorAll('nav a')) {
       if (a.hash === '#' + view) a.setAttribute('aria-current', 'page');
@@ -283,11 +377,10 @@
         ...LAB.queue.map(renderExercise));
     } else {
       const m = LAB.modules.find((x) => x.id === view);
-      const n = m.exercises.filter((e) => state.submitted[e.id]).length;
       main.append(
         h('h2', {}, m.cwe + ': ' + m.title),
-        h('p', { class: 'intro' }, m.intro + ' ' + n + ' of ' + m.exercises.length + ' submitted.'),
-        ...m.exercises.map(renderExercise),
+        renderBasics(m),
+        renderPractice(m),
         h('aside', { class: 'sources', 'aria-label': 'Sources' }, h('h3', {}, 'Sources'),
           h('ul', {}, m.links.map(([t, href]) => h('li', {}, h('a', { href, rel: 'noopener noreferrer' }, t))))));
     }
@@ -301,8 +394,23 @@
     try { if (store) store.removeItem(KEY); } catch (e) { warn('Could not remove saved progress (' + e.name + ').'); return; }
     blocked = false;
     state = emptyState();
+    practiceOpen.clear();
     warnEl.hidden = true;
     render();
+  });
+
+  // Mobile menu: CSS hides the nav below 760px unless .open; on desktop the button is hidden.
+  const menuBtn = document.getElementById('menu');
+  const nav = document.getElementById('modules');
+  const setMenu = (open) => { menuBtn.setAttribute('aria-expanded', String(open)); nav.classList.toggle('open', open); };
+  menuBtn.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+  nav.addEventListener('click', (e) => {
+    if (!e.target.closest('a') || !nav.classList.contains('open')) return;
+    setMenu(false);
+    main.focus(); // the tapped link is about to be hidden
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('open')) { setMenu(false); menuBtn.focus(); }
   });
 
   window.addEventListener('hashchange', render);

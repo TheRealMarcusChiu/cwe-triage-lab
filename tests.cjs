@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const LAB = require('./data.js');
-const { validateEnvelope, missingFields, grade, VERSION, MIN_TEXT, UNGRADED } = require('./app.js');
+const { validateEnvelope, missingFields, grade, traceStep, VERSION, MIN_TEXT, UNGRADED } = require('./app.js');
 
 let passed = 0;
 const test = (name, fn) => {
@@ -19,6 +19,44 @@ const complete = (ex) => ({
 const env = (o) => JSON.stringify({ version: VERSION, view: '', drafts: {}, submitted: {}, fixes: {}, ...o });
 
 test('four modules in the required order', () => assert.deepEqual(LAB.modules.map((m) => m.cwe), ['CWE-94', 'CWE-79', 'CWE-78', 'CWE-22']));
+
+test('every module has a beginner block: tiny unsafe + fixed snippet, ordinary and harmful samples', () => {
+  for (const m of LAB.modules) {
+    const b = m.basics;
+    assert.ok(b && b.lesson.length <= 140, m.id + ' short lesson');
+    const lines = (c) => c.split('\n').length;
+    assert.ok(lines(b.unsafe.code) >= 2 && lines(b.unsafe.code) <= 5, m.id + ' unsafe 2-5 lines');
+    assert.ok(lines(b.fixed.code) >= 2 && lines(b.fixed.code) <= 6, m.id + ' fixed 2-6 lines');
+    for (const k of ['unsafe', 'fixed']) assert.ok(b[k].hot >= 0 && b[k].hot < lines(b[k].code), m.id + ' ' + k + ' hot line');
+    const kinds = b.samples.map((s) => s.kind);
+    assert.ok(kinds.includes('Ordinary') && kinds.includes('Harmful'), m.id + ' sample kinds');
+    for (const s of b.samples) {
+      assert.ok(s.input, m.id + ' sample input');
+      for (const k of ['unsafe', 'fixed']) assert.ok(s[k].op && s[k].out && ['ok', 'harm', 'blocked'].includes(s[k].effect), m.id + ' ' + s.input + ' ' + k);
+      if (s.kind === 'Ordinary') assert.deepEqual([s.unsafe.effect, s.fixed.effect], ['ok', 'ok'], m.id + ' ordinary works both ways');
+      else assert.deepEqual([s.unsafe.effect, s.fixed.effect], ['harm', 'blocked'], m.id + ' harmful: unsafe harms, fixed blocks');
+    }
+  }
+  assert.ok(LAB.queue.every((q) => !q.basics), 'queue has no beginner block (would leak the family)');
+});
+
+test('beginner fixes address the toy weakness, not just rename it', () => {
+  const fix = Object.fromEntries(LAB.modules.map((m) => [m.id, m.basics.fixed.code]));
+  const bad = Object.fromEntries(LAB.modules.map((m) => [m.id, m.basics.unsafe.code]));
+  assert.match(bad.m94, /eval\(/); assert.doesNotMatch(fix.m94, /eval|Function|vm\./); assert.match(fix.m94, /\/\^[^\n]*\$\/\.(exec|test)\(/); assert.match(fix.m94, /return res\.sendStatus\(400\)/);
+  assert.match(bad.m79, /innerHTML/); assert.doesNotMatch(fix.m79, /innerHTML/); assert.match(fix.m79, /textContent/);
+  assert.match(bad.m78, /exec\(/); assert.doesNotMatch(fix.m78, /exec\(|shell:/); assert.match(fix.m78, /execFile\(/); assert.match(fix.m78, /\.has\(host\)/);
+  assert.match(bad.m22, /path\.join\([^)]*req\./); assert.doesNotMatch(fix.m22, /path\.join\([^)]*req\.|startsWith/); assert.match(fix.m22, /new Map[\s\S]*\.get\(req\./);
+});
+
+test('traceStep reveals input, operation, result one step at a time and nothing stale', () => {
+  const s = LAB.modules[0].basics.samples[1];
+  assert.deepEqual(traceStep(s, 'unsafe', 0), [null, null, null]);
+  assert.deepEqual(traceStep(s, 'unsafe', 1), [s.input, null, null]);
+  assert.deepEqual(traceStep(s, 'fixed', 2), [s.input, s.fixed.op, null]);
+  assert.deepEqual(traceStep(s, 'fixed', 3), [s.input, s.fixed.op, s.fixed.out]);
+  assert.deepEqual(traceStep(s, 'fixed', 9), traceStep(s, 'fixed', 3), 'clamped');
+});
 
 test('exercise ids unique', () => assert.equal(new Set(all.map((e) => e.id)).size, all.length));
 
@@ -156,6 +194,14 @@ test('feedback and README disclose that written answers are not machine-graded',
   assert.match(UNGRADED, /rationale, impact, ticket and verification are not machine-graded: compare your own text with the worked answer/);
   assert.match(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), /return h\('section', \{ class: 'feedback'[\s\S]*h\('p', \{ class: 'ungraded' \}, UNGRADED\)/);
   assert.ok(fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8').includes(UNGRADED), 'README sentence matches');
+});
+
+test('fonts are local files with licenses; no external URLs in page sources', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+  for (const f of ['jetbrains-mono-normal-400.ttf', 'newsreader-normal-500.ttf', 'newsreader-italic-500.ttf', 'jetbrainsmono-OFL.txt', 'newsreader-OFL.txt']) assert.ok(fs.existsSync(path.join(__dirname, 'fonts', f)), f);
+  assert.equal((css.match(/@font-face/g) || []).length, 3);
+  assert.doesNotMatch(css, /font-weight:\s*[6-9]00|font-weight:\s*bold/, 'no weight that is not shipped');
+  for (const f of ['style.css', 'index.html']) assert.doesNotMatch(fs.readFileSync(path.join(__dirname, f), 'utf8'), /https?:\/\/(?!cwe\.mitre|owasp)/, f);
 });
 
 test('app.js never uses HTML or code-evaluating sinks', () => {

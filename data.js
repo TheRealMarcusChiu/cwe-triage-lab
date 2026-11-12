@@ -28,6 +28,37 @@
         ['MITRE CWE-95: Eval Injection (child of CWE-94)', SRC.cwe95],
         ['OWASP Code Injection', SRC.code],
       ],
+      // Beginner first screen. Outcomes are fixed strings; nothing runs.
+      basics: {
+        lesson: 'Never run user text as code. Check its shape, then call a fixed function you wrote.',
+        unsafe: {
+          code: "const expr = req.query.expr;   // \"2 + 3\"\nres.send(String(eval(expr)));",
+          hot: 1,
+        },
+        fixed: {
+          code: [
+            'const m = /^(\\d+) ([+*]) (\\d+)$/.exec(req.query.expr);',
+            'if (!m) return res.sendStatus(400);',
+            "const OPS = { '+': (a, b) => a + b, '*': (a, b) => a * b };",
+            'res.send(String(OPS[m[2]](Number(m[1]), Number(m[3]))));',
+          ].join('\n'),
+          hot: 1,
+        },
+        samples: [
+          {
+            kind: 'Ordinary',
+            input: '2 + 3',
+            unsafe: { op: 'eval runs the text as JavaScript', out: '5', effect: 'ok' },
+            fixed: { op: 'Matches "number op number"; calls OPS["+"]', out: '5', effect: 'ok' },
+          },
+          {
+            kind: 'Harmful',
+            input: "require('fs').readFileSync('.env')",
+            unsafe: { op: 'eval runs the text as JavaScript', out: 'Server secrets from .env sent back', effect: 'harm' },
+            fixed: { op: 'Does not match "number op number"', out: '400 Bad Request: nothing ran', effect: 'blocked' },
+          },
+        ],
+      },
       exercises: [
         {
           id: 'm94-promo',
@@ -139,6 +170,31 @@
         ['MITRE CWE-79: Improper Neutralization of Input During Web Page Generation', SRC.cwe79],
         ['OWASP Cross Site Scripting Prevention Cheat Sheet', SRC.xss],
       ],
+      basics: {
+        lesson: 'Put user text into the page as text, not HTML. (Rich HTML needs a sanitizer: see Practice.)',
+        unsafe: {
+          code: "const name = params.get('name');\nhello.innerHTML = 'Hi ' + name;",
+          hot: 1,
+        },
+        fixed: {
+          code: "const name = params.get('name');\nhello.textContent = 'Hi ' + name;",
+          hot: 1,
+        },
+        samples: [
+          {
+            kind: 'Ordinary',
+            input: 'Ana',
+            unsafe: { op: 'innerHTML parses the string as HTML', out: 'Hi Ana', effect: 'ok' },
+            fixed: { op: 'textContent makes one text node', out: 'Hi Ana', effect: 'ok' },
+          },
+          {
+            kind: 'Harmful',
+            input: '<img src=x onerror=alert(1)>',
+            unsafe: { op: 'innerHTML parses the string as HTML', out: 'Browser builds an <img>; its onerror script runs', effect: 'harm' },
+            fixed: { op: 'textContent makes one text node', out: 'Hi <img src=x onerror=alert(1)>   (shown as plain text)', effect: 'blocked' },
+          },
+        ],
+      },
       exercises: [
         {
           id: 'm79-reflected',
@@ -345,6 +401,42 @@
         ['MITRE CWE-88: Argument Injection', SRC.cwe88],
         ['OWASP OS Command Injection Defense Cheat Sheet', SRC.cmd],
       ],
+      basics: {
+        lesson: 'Skip the shell, and only accept values you expect, so input cannot add commands or options.',
+        unsafe: {
+          code: "const host = req.query.host;   // \"web-1\"\nexec('ping -c 1 ' + host);",
+          hot: 1,
+        },
+        fixed: {
+          code: [
+            "const HOSTS = new Set(['web-1', 'web-2']);",
+            'const host = req.query.host;',
+            'if (!HOSTS.has(host)) return res.sendStatus(400);',
+            "execFile('ping', ['-c', '1', host]);   // no shell",
+          ].join('\n'),
+          hot: 2,
+        },
+        samples: [
+          {
+            kind: 'Ordinary',
+            input: 'web-1',
+            unsafe: { op: 'Shell runs: ping -c 1 web-1', out: 'ping runs: 1 packet received from web-1', effect: 'ok' },
+            fixed: { op: 'web-1 is on the list; ping gets it as one argument', out: 'ping runs: 1 packet received from web-1', effect: 'ok' },
+          },
+          {
+            kind: 'Harmful',
+            input: 'web-1; cat /etc/passwd',
+            unsafe: { op: 'Shell splits at ";" and runs a second command', out: 'Shell also runs cat /etc/passwd as the app user', effect: 'harm' },
+            fixed: { op: 'Not on the list', out: '400 Bad Request: no command ran', effect: 'blocked' },
+          },
+          {
+            kind: 'Harmful',
+            input: '-f web-1',
+            unsafe: { op: 'ping parses -f as an option, not a hostname', out: 'Attacker changes ping options (still limited by -c 1)', effect: 'harm' },
+            fixed: { op: 'Not on the list (options never reach ping)', out: '400 Bad Request: no command ran', effect: 'blocked' },
+          },
+        ],
+      },
       exercises: [
         {
           id: 'm78-lookup',
@@ -500,6 +592,36 @@
         ['MITRE CWE-22: Improper Limitation of a Pathname to a Restricted Directory', SRC.cwe22],
         ['OWASP Path Traversal', SRC.path],
       ],
+      basics: {
+        lesson: 'Do not build file paths from user text. Look the name up in a list the server controls.',
+        unsafe: {
+          code: "const file = path.join('/srv/files', req.query.name);\nres.sendFile(file);",
+          hot: 0,
+        },
+        fixed: {
+          code: [
+            "const FILES = new Map([['report.pdf', 'a91f.pdf']]);   // set by the server",
+            'const stored = FILES.get(req.query.name);',
+            'if (!stored) return res.sendStatus(404);',
+            "res.sendFile(path.join('/srv/files', stored));",
+          ].join('\n'),
+          hot: 1,
+        },
+        samples: [
+          {
+            kind: 'Ordinary',
+            input: 'report.pdf',
+            unsafe: { op: 'Path becomes /srv/files/report.pdf', out: 'report.pdf downloaded', effect: 'ok' },
+            fixed: { op: 'Map has report.pdf → a91f.pdf', out: 'report.pdf downloaded', effect: 'ok' },
+          },
+          {
+            kind: 'Harmful',
+            input: '../../etc/passwd',
+            unsafe: { op: 'Each ../ climbs up: path becomes /etc/passwd', out: 'The server\'s /etc/passwd downloaded', effect: 'harm' },
+            fixed: { op: 'Map has no such key; no path is built', out: '404 Not Found', effect: 'blocked' },
+          },
+        ],
+      },
       exercises: [
         {
           id: 'm22-invoice',

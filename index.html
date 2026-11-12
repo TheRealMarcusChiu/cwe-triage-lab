@@ -3,29 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
   <title>CWE Triage Lab</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <a class="skip" href="#main">Skip to exercise</a>
-  <header>
-    <p class="brand">CWE Triage Lab <span>scanner alert drills</span></p>
-    <nav aria-label="Modules">
-      <a href="#m94">Code generation</a>
-      <a href="#m79">Cross-site scripting</a>
-      <a href="#m78">OS commands</a>
-      <a href="#m22">Path traversal</a>
-      <a href="#queue">Mixed queue</a>
+  <a class="skip" href="#main">Skip to lesson</a>
+  <header class="sidebar">
+    <p class="brand">CWE Triage Lab</p>
+    <button type="button" id="menu" class="menu" aria-expanded="false" aria-controls="modules">☰ Modules</button>
+    <nav id="modules" aria-label="Modules">
+      <a href="#m94"><span class="cwe">CWE-94</span> Code injection</a>
+      <a href="#m79"><span class="cwe">CWE-79</span> XSS</a>
+      <a href="#m78"><span class="cwe">CWE-78</span> Commands</a>
+      <a href="#m22"><span class="cwe">CWE-22</span> Paths</a>
+      <a href="#queue"><span class="cwe">All four</span> Mixed queue</a>
     </nav>
   </header>
-  <p id="storage-warning" class="warning" role="alert" hidden></p>
-  <main id="main" tabindex="-1"></main>
-  <footer>
-    <p>Local only: drafts and progress are stored in this browser's localStorage under one key and are never sent anywhere. Anyone using this browser profile can read them.</p>
-    <button type="button" id="reset" class="quiet">Reset saved progress</button>
-  </footer>
-  <noscript><p class="warning">This lab needs JavaScript enabled.</p></noscript>
+  <div class="content">
+    <p id="storage-warning" class="warning" role="alert" hidden></p>
+    <main id="main" tabindex="-1"></main>
+    <footer>
+      <p>Local only: drafts and progress are stored in this browser's localStorage under one key and are never sent anywhere. Anyone using this browser profile can read them.</p>
+      <button type="button" id="reset" class="quiet">Reset saved progress</button>
+    </footer>
+    <noscript><p class="warning">This lab needs JavaScript enabled.</p></noscript>
+  </div>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
