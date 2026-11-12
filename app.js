@@ -273,11 +273,13 @@
   let timer = 0;
   const stopTimer = () => { clearTimeout(timer); timer = 0; };
 
-  // Beginner first screen: tiny unsafe vs fixed snippet plus a user-driven Input -> operation -> result trace.
+  // Beginner tutorial, read top to bottom: 1 problem, 2 unsafe code, 3 step one input through it, 4 the fix,
+  // then optional "Try another input or code". One demo state drives the step-3 trace and the lit snippet line.
   // Outcomes are predefined strings from data.js written with textContent; nothing is executed.
   function renderBasics(m) {
     const b = m.basics;
-    const demo = { sample: 0, mode: 'unsafe', step: 0 };
+    // Start on a harmful sample so the first trace shows the concrete problem.
+    const demo = { sample: Math.max(0, b.samples.findIndex((s) => s.kind === 'Harmful')), mode: 'unsafe', step: 0 };
     const fid = (k) => m.id + '-demo-' + k;
     const lines = {};
     const figs = {};
@@ -311,7 +313,8 @@
         figs[k].classList.toggle('active', demo.mode === k);
         lines[k][b[k].hot].classList.toggle('lit', demo.mode === k && demo.step >= 2);
       }
-      status.textContent = done ? 'Result: ' + EFFECT[s[demo.mode].effect] + '.' : demo.step ? 'Step ' + demo.step + ' of 3.' : 'Pick a sample and code, then press Run or Step.';
+      status.textContent = done ? 'Result: ' + EFFECT[s[demo.mode].effect] + '.' : demo.step ? 'Step ' + demo.step + ' of 3.'
+        : 'Ready: the ' + s.kind.toLowerCase() + ' input "' + s.input + '" goes into the ' + demo.mode + ' code. Press Step through input.';
     }
     const reset = () => { stopTimer(); demo.step = 0; paint(); };
     function run(from) {
@@ -326,21 +329,44 @@
         h('input', { type: 'radio', name: fid(name), id: fid(name + '-' + v), value: String(v), checked: demo[key] === v, onchange: () => { demo[key] = v; reset(); } }),
         ' ', label)));
 
+    const part = (n, title, ...kids) => h('section', { class: 'step', id: fid('part-' + n), 'aria-labelledby': fid('part-' + n + '-h') },
+      h('h3', { id: fid('part-' + n + '-h') }, n + '. ' + title), ...kids);
+    const step3 = part(3, 'Follow one input',
+      h('p', {}, 'Send one input through the code and watch each stage: the input, what the sink does with it, and the result.'),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', id: fid('step'), onclick: () => { stopTimer(); demo.step = demo.step >= 3 ? 1 : demo.step + 1; paint(); } }, 'Step through input')),
+      h('ol', { class: 'trace', 'aria-label': 'Data trace' }, slots.map((x) => x.li)),
+      status,
+      h('p', { class: 'muted small' }, 'Outcomes are written in advance. Nothing is executed.'));
+    // Run and Replay sit at the end of the page; bring the step-3 trace they drive back into view.
+    const runFrom = (from) => { run(from); step3.scrollIntoView({ block: 'start' }); };
+
     const section = h('section', { class: 'basics', 'aria-label': 'Beginner lesson' },
-      h('p', { class: 'lesson' }, b.lesson),
-      h('div', { class: 'compare' }, figs.unsafe, figs.fixed),
-      h('div', { class: 'demo', role: 'group', 'aria-label': 'Try it: predefined outcomes, nothing is executed' },
-        h('h3', {}, 'Try it'),
-        h('div', { class: 'controls' },
+      part(1, 'Understand the problem',
+        h('p', {}, b.problem),
+        h('dl', { class: 'terms' },
+          h('dt', {}, 'Input'), h('dd', {}, 'Text that comes from outside the app, such as a web address or a form field. Anyone can change it.'),
+          h('dt', {}, 'Code'), h('dd', {}, 'The instructions the app runs.'),
+          h('dt', {}, 'Sink'), h('dd', {}, 'The operation in the code that uses the input, such as running it, showing it on a page, starting a command or opening a file.')),
+        h('p', {}, b.why)),
+      part(2, 'Read the unsafe code',
+        h('p', {}, 'This is the whole unsafe example. The sink is on line ' + (b.unsafe.hot + 1) + '.'),
+        figs.unsafe),
+      step3,
+      part(4, 'See the fix',
+        h('p', {}, 'The same feature, written safely. The line that protects it is line ' + (b.fixed.hot + 1) + '.'),
+        figs.fixed,
+        h('p', {}, b.works),
+        h('p', { class: 'lesson' }, b.lesson)),
+      h('details', { class: 'try', id: fid('try') },
+        h('summary', {}, 'Try another input or code'),
+        h('div', { role: 'group', 'aria-label': 'Try it: predefined outcomes, nothing is executed' },
+          h('p', {}, 'Choose an input and the code to send it through, then press Run. The trace in step 3 shows what happens.'),
           choice('sample', 'Input', b.samples.map((s, i) => [i, s.kind + ': ' + s.input]), 'sample'),
-          choice('mode', 'Code', [['unsafe', 'Unsafe'], ['fixed', 'Fixed']], 'mode')),
-        h('div', { class: 'actions' },
-          h('button', { type: 'button', id: fid('run'), onclick: () => run(demo.step) }, 'Run'),
-          h('button', { type: 'button', id: fid('step'), class: 'quiet', onclick: () => { stopTimer(); demo.step = demo.step >= 3 ? 1 : demo.step + 1; paint(); } }, 'Step'),
-          h('button', { type: 'button', id: fid('replay'), class: 'quiet', onclick: () => run(0) }, 'Replay')),
-        h('ol', { class: 'trace', 'aria-label': 'Data trace' }, slots.map((x) => x.li)),
-        status,
-        h('p', { class: 'muted small' }, 'Outcomes are written in advance. Nothing is executed.')));
+          choice('mode', 'Code', [['unsafe', 'Unsafe'], ['fixed', 'Fixed']], 'mode'),
+          h('div', { class: 'actions' },
+            h('button', { type: 'button', id: fid('run'), onclick: () => runFrom(demo.step) }, 'Run'),
+            h('button', { type: 'button', id: fid('replay'), class: 'quiet', onclick: () => runFrom(0) }, 'Replay')))));
     paint();
     return section;
   }
@@ -381,8 +407,8 @@
         h('h2', {}, m.cwe + ': ' + m.title),
         renderBasics(m),
         renderPractice(m),
-        h('aside', { class: 'sources', 'aria-label': 'Sources' }, h('h3', {}, 'Sources'),
-          h('ul', {}, m.links.map(([t, href]) => h('li', {}, h('a', { href, rel: 'noopener noreferrer' }, t))))));
+        h('aside', { class: 'sources', 'aria-label': 'Sources' }, h('details', {}, h('summary', {}, 'Sources'),
+          h('ul', {}, m.links.map(([t, href]) => h('li', {}, h('a', { href, rel: 'noopener noreferrer' }, t)))))));
     }
   }
 

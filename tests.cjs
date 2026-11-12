@@ -20,10 +20,12 @@ const env = (o) => JSON.stringify({ version: VERSION, view: '', drafts: {}, subm
 
 test('four modules in the required order', () => assert.deepEqual(LAB.modules.map((m) => m.cwe), ['CWE-94', 'CWE-79', 'CWE-78', 'CWE-22']));
 
-test('every module has a beginner block: tiny unsafe + fixed snippet, ordinary and harmful samples', () => {
+test('every module has a beginner block: problem, why, fix explanation, tiny unsafe + fixed snippet, ordinary and harmful samples', () => {
   for (const m of LAB.modules) {
     const b = m.basics;
     assert.ok(b && b.lesson.length <= 140, m.id + ' short lesson');
+    for (const k of ['problem', 'why', 'works']) assert.ok(typeof b[k] === 'string' && b[k].length >= 60 && b[k].length <= 320, m.id + ' plain-English ' + k);
+    assert.match(b.why, /input is[\s\S]*sink is/, m.id + ' why names this example\'s input and sink');
     const lines = (c) => c.split('\n').length;
     assert.ok(lines(b.unsafe.code) >= 2 && lines(b.unsafe.code) <= 5, m.id + ' unsafe 2-5 lines');
     assert.ok(lines(b.fixed.code) >= 2 && lines(b.fixed.code) <= 6, m.id + ' fixed 2-6 lines');

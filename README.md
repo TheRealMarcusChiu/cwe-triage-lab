@@ -5,9 +5,13 @@ A static workbench for learning four weaknesses and practising scanner-alert tri
 ## First run
 
 1. Pick a weakness in the left sidebar (on phones, the **☰ Modules** button opens it). The lab opens on CWE-94.
-2. Read the one-line lesson, then the tiny **✗ Unsafe** snippet next to its **✓ Fixed** snippet (stacked on small screens).
-3. In **Try it**, choose an ordinary or harmful input and the unsafe or fixed code, then press **Run** (animated), **Step** (one stage at a time) or **Replay**. The trace highlights Input → Operation → Result, lights the dangerous or protective line in the chosen snippet, and labels the outcome *Works*, *Harmful effect* or *Blocked*. Outcomes are predefined text. Nothing is executed. With reduced motion turned on in the operating system, Run shows the result at once.
-4. Open **Practice triage** when you are ready for the full scanner-alert exercises described below. It starts closed and reopens on its own once you have saved a draft or submission for that module.
+2. Read the lesson from top to bottom, in one column:
+   1. **Understand the problem**: a plain-English example, what *input*, *code* and *sink* mean, and why this example is unsafe.
+   2. **Read the unsafe code**: the tiny **✗ Unsafe** snippet.
+   3. **Follow one input**: press **Step through input** to send a harmful input through the unsafe code one stage at a time. The trace runs down the page, Input → Operation → Result, lights the dangerous line and labels the outcome *Works*, *Harmful effect* or *Blocked*. Nothing animates until you press it.
+   4. **See the fix**: the **✓ Fixed** snippet, why it works, and the one-line rule.
+3. Optional: open **Try another input or code** to choose an ordinary or harmful input and the unsafe or fixed code, then press **Run** (animated) or **Replay**. The trace in step 3 shows the result. Outcomes are predefined text. Nothing is executed. With reduced motion turned on in the operating system, Run shows the result at once.
+4. Open **Practice triage** when you are ready for the full scanner-alert exercises described below. It starts closed and reopens on its own once you have saved a draft or submission for that module. A closed **Sources** disclosure follows at the end; open it for the module's references.
 
 The **Mixed queue** has no beginner lesson, because the lesson would name each case's weakness family.
 
@@ -71,8 +75,9 @@ Edit `data.js`:
 Each module also has `basics` (the queue must not have one):
 
 - `lesson`: one sentence, 140 characters at most.
+- `problem`, `why` and `works`: short plain-English paragraphs for steps 1 and 4: the example feature, why it is unsafe (naming this example's input and sink as "the input is … the sink is …"), and why the fix works.
 - `unsafe` and `fixed`: `{ code, hot }`. `code` is 2–5 lines (unsafe) or 2–6 lines (fixed). `hot` is the 0-based index of the dangerous line or the protective line that the trace lights up.
-- `samples`: `[{ kind: 'Ordinary' | 'Harmful', input, unsafe: { op, out, effect }, fixed: { op, out, effect } }]`. `effect` is `ok`, `harm` or `blocked`. Ordinary samples must be `ok` both ways. Harmful samples must be `harm` unsafe and `blocked` fixed.
+- `samples`: `[{ kind: 'Ordinary' | 'Harmful', input, unsafe: { op, out, effect }, fixed: { op, out, effect } }]`. `effect` is `ok`, `harm` or `blocked`. Step 3 starts on the first `Harmful` sample. Ordinary samples must be `ok` both ways. Harmful samples must be `harm` unsafe and `blocked` fixed.
 - The fix must really remove the weakness. `node tests.cjs` checks the toy fixes for these patterns: no eval, plus a validated fixed handler; `textContent`; no shell, plus an allowlist; a server-side `Map` lookup instead of joining request text.
 
 Demo choices are kept in memory only and never stored.

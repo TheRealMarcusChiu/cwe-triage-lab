@@ -31,6 +31,9 @@
       // Beginner first screen. Outcomes are fixed strings; nothing runs.
       basics: {
         lesson: 'Never run user text as code. Check its shape, then call a fixed function you wrote.',
+        problem: 'A calculator page reads a sum such as "2 + 3" from the web address and shows the answer. To work it out, the server passes the text to eval(), which runs any JavaScript it is given.',
+        why: 'Here the input is the expr text in the web address, and the sink is eval(). Anyone can put real JavaScript in the address instead of a sum, and the server runs it with its own access, for example to read its secret files.',
+        works: 'The fixed code never runs the text. It first checks that the text looks like "number, + or *, number" and answers 400 to anything else. Then it calls a small function the developer wrote, so the only thing that can happen is adding or multiplying.',
         unsafe: {
           code: "const expr = req.query.expr;   // \"2 + 3\"\nres.send(String(eval(expr)));",
           hot: 1,
@@ -172,6 +175,9 @@
       ],
       basics: {
         lesson: 'Put user text into the page as text, not HTML. (Rich HTML needs a sanitizer: see Practice.)',
+        problem: 'A welcome banner reads a name from the web address, such as ?name=Ana, and shows "Hi Ana" at the top of the page.',
+        why: 'Here the input is the name in the web address, and the sink is innerHTML, which reads its text as HTML. If someone sends a visitor a link whose name contains an HTML tag, the browser builds that tag, and a script in it runs as that visitor on this site.',
+        works: 'textContent puts the name on the page as plain text. The browser never reads it as HTML, so a tag appears as ordinary characters and nothing runs.',
         unsafe: {
           code: "const name = params.get('name');\nhello.innerHTML = 'Hi ' + name;",
           hot: 1,
@@ -403,6 +409,9 @@
       ],
       basics: {
         lesson: 'Skip the shell, and only accept values you expect, so input cannot add commands or options.',
+        problem: 'An internal support page checks that a server is up by running the ping program. The server name, such as web-1, comes from the web address, and the code glues it onto a command line.',
+        why: 'Here the input is the host text, and the sink is exec(), which hands the whole line to a shell. To a shell, ";" means "now run another command", so extra text becomes extra commands. Text that starts with "-" can also turn into ping options.',
+        works: 'The fixed code only accepts server names from its own list and answers 400 to anything else. execFile() then starts ping directly, with no shell, and passes the name as one argument, so nothing in it can start another command.',
         unsafe: {
           code: "const host = req.query.host;   // \"web-1\"\nexec('ping -c 1 ' + host);",
           hot: 1,
@@ -594,6 +603,9 @@
       ],
       basics: {
         lesson: 'Do not build file paths from user text. Look the name up in a list the server controls.',
+        problem: 'A download page sends a file by name, such as ?name=report.pdf, from the folder /srv/files.',
+        why: 'Here the input is the name in the web address, and the sink is the file path that path.join() builds and sendFile() opens. Each "../" in a path means "go up one folder", so a name can climb out of /srv/files and download any file the server can read.',
+        works: 'The fixed code never builds a path from user text. It looks the name up in a list the server wrote. A name that is not on the list gets 404, and the path comes only from the server\'s own entry.',
         unsafe: {
           code: "const file = path.join('/srv/files', req.query.name);\nres.sendFile(file);",
           hot: 0,
